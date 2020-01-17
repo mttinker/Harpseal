@@ -33,7 +33,7 @@ data {
   int<lower=1> AgePRsmp[NPRobs];  // Age of each female pregnancy status sample
   real N0pri ;                    // prior estimate of starting abundance
   real gamm0;                     // Nuiscence param: base log hazards
-  real thta;                      // theta param for theta-logistic density dependence
+  // real thta;                      // theta param for theta-logistic density dependence
   real DDadlt[Nages] ;            // age-sepcific scaling factor for adult D-D 
   real<lower=0> b0;               // Fecundity: Logit of max adult pregancy rate
   real<lower=0> psipri1a ;        // Ice anomaly effect on pup survival, fxn param 1 mn
@@ -42,22 +42,23 @@ data {
   real<lower=0> psipri2b ;        // Ice anomaly effect on pup survival, fxn param 2 sd
   vector<lower=0>[Nareas] PApri;  // prior estimate, proportional pup allocation by area
   real CV_HV ;                    // CV associated with harvest counts
-  real Adhzpri ;                  // adult log hazard rate
-  real Jvhzpri ;                  // juvenile log hazard rate
+  real Adhzpri ;                  // adult log hazard rate prior (FIXED value)
+  real Jvhzpri ;                  // juvenile log hazard rate prior
 }
 transformed data {
   real aA;
-  real aJ;
+  //real aJ;
   aA = Adhzpri;
-  aJ = Jvhzpri ;    
+  //aJ = Jvhzpri ;    
 }
 // The parameters to be estimated 
 parameters {
   simplex[Nareas] PA[Nyrs-1] ;      // Annual proportional pup distribution across areas
-  // real<lower=0> aJ;               // Juvenile survival hazard ratio
+  real<lower=0> aJ;               // Juvenile survival hazard ratio
   // real<lower=0> aA;               // Adult survival hazard ratio, intercept
   real<lower=0> phiJ;             // Juvenile survival D-D effects 
   real<lower=0> phiF;             // Fecundity (preg rate) D-D effects
+  real<lower=0> thta;             // theta parameter: controls "shape" of DD
   real<lower=0> b1;               // Fecundity: age effect (reduced for younger)
   real<lower=0> psi1;             // Ice anomaly effect on pup survival, fxn param 1 
   real<lower=0> psi2;             // Ice anomaly effect on pup survival, fxn param 2 
@@ -185,10 +186,11 @@ model {
     PA[y] ~ dirichlet(PApri); 
   }  
   // Prior distributions for model parameters
-  // aJ ~ normal(Jvhzpri,1) ; 
+  aJ ~ normal(Jvhzpri,.75) ; 
   // aA ~ normal(Adhzpri,0.5) ;
   phiJ ~ cauchy(0,0.5) ;
   phiF ~ cauchy(0,0.5) ;
+  thta ~ gamma(3,2) ;
   b1 ~ normal(0.25,0.1) ;
   psi1 ~ normal(psipri1a,psipri1b) ;
   psi2 ~ normal(psipri2a,psipri2b) ;
@@ -196,8 +198,8 @@ model {
   // sigJ ~ cauchy(0,2.5) ;
   sigF ~ cauchy(0,2.5) ;
   sigH ~ cauchy(0,2.5) ;
-  gammHp_mn ~ normal(5.5,1) ;
-  gammHa_mn ~ normal(2.75,1) ;
+  gammHp_mn ~ normal(5.5,2) ;
+  gammHa_mn ~ normal(3,1.5) ;
 }
 // Derived params (e.g. goodness of fit stats)
 generated quantities {
@@ -220,7 +222,7 @@ generated quantities {
   Fc1966_prdct = Fc[16][1:Nages];
   Fc2016_prdct = Fc[66][1:Nages];
   for (a in 1:Nareas){
-     PAmean[a] = mean(PA[1:(Nyrs-1)][a]) ;
+     PAmean[a] = sum(PredPupA[1:(Nyrs-1)][a])/sum(PredPup[1:(Nyrs-1)]) ;
   }
 //   c = 0 ;
 //   for (i in 1:NPcts){ 

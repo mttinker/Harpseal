@@ -2,23 +2,22 @@
 #
 # User-set parameters--------------------------------------------------------
 #
-fitoption = 2 # if option 1, fix N0 and fit adult Sx, option 2 = fit N0
-# First year to be included in time series for model fitting 
-Year1 = 1951; # Note: should be first year harvest data available
-# Last year for model fitting: year AFTER last available data for fitting 
-YearT = 2020; 
+fitoption = 2 # option 1=fix N0, fit adlt Sx; option 2=fit N0, fix adlt Sx
+# Specify year range of time series for model fitting 
+Year1 = 1951; #  Year1 = first year that harvest data available
+YearT = 2020; #  YearT = year AFTER last available data for fitting
 # Initial Population size year 1, approximate guess and CV (for weak prior):
-N0pri = 1500000 # prior estimate of startong pop size, default ~ 2.5 million
-# Assumed CV for harvest/bycatch totals
-CV_HV = 0.1
+N0pri = 2000000 # prior guess of starting pop size, default ~ 2 million
+# Assumed CV for harvest/bycatch totals:
+CV_HV = 0.1 
 # Priors for expected proportion of pups by area (S.GSL, N.GSL, Front):
 PApri = c(0.18,0.07,0.75) # (used for weak dirichlet prior) 
 # Priors for demographic params
 Adl_hz =  4     # Adult base log hazards : 4 --> Sx=0.95 with no harvest
-Juv_hz_rt = 2.5 # ratio of juvenile hazard rate to adult hazard rate
-thta = 2.4      # "theta" for density-dependent effects (theta-logistic)
+Juv_hz_rt = 4   # ratio of juvenile inst. hazard rate to adult hazard rate
+theta = 2.4     # "theta" for density-dependent "shape" ** will be estimated!
 psi1 = 4        # prior for psi param1 of ice anomaly effect fxn (see figure)
-psi2 = .8      # prior for psi param2 of ice anomaly effect fxn 
+psi2 = .8       # prior for psi param2 of ice anomaly effect fxn 
 b0 = 2.4        # prior for logit of max adult pregancy rate (3 --> Fx=0.95)
 #
 # End user params, plot ice mort prior---------------------------------------
@@ -123,9 +122,9 @@ rm(i,c,ii,y,aa)
 # Set up Jags inputs --------------------------------------------------------
 #
 if (fitoption==1){
-  fitmodel = c("HSmodfit2.stan")
+  fitmodel = c("HSmodfit1.stan")
 }else{
-  fitmodel = c("HSmodfit3.stan")
+  fitmodel = c("HSmodfit2.stan")
 }
 #  
 stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
@@ -136,18 +135,22 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,DDadlt=DDadlt,psipri1a=psipri1a,
                   psipri1b=psipri1b,psipri2a=psipri2a,psipri2b=psipri2b,
                   b0=b0,psi1=psi1,psi2=psi2,Adhzpri=Adhzpri,Jvhzpri=Jvhzpri,
-                  CV_HV=CV_HV,thta=thta,gamm0=gamm0,PApri=PApri,N0pri=N0pri) #
+                  CV_HV=CV_HV,gamm0=gamm0,PApri=PApri,N0pri=N0pri) # thta=thta
 #
 init_fun <- function() {list(sigF=runif(1, .8, 1),
                              sigH=runif(1, .8, 1),
                              phiJ=runif(1, .15, .2),
                              phiF=runif(1, .15, .2),
-                             b1=runif(1, .23, .25),
+                             b1=runif(1, .16, .2),
                              psi1=runif(1, psipri1a-1, psipri1a+1),
                              psi2=runif(1, psipri2a-.5, psipri2a+.5),
                              dlta=runif(1, .02, .05),
-                             gammHp_mn=runif(1, 5.5, 6),
-                             gammHa_mn=runif(1, 2.7, 3) )}
+                             gammHp_mn=runif(1, 5.2, 5.5),
+                             gammHa_mn=runif(1, 2.8, 3.2),
+                             thta = runif(1, 1.5, 2),
+                             aJ = runif(1, Jvhzpri-.2,Jvhzpri+.2)
+                             # gammHp_mn = 0, gammHa_mn = 0
+                             )}
 #
 # For testing inits-----------------------------------------------------
 #
@@ -157,8 +160,8 @@ Yearp = seq(Year1,YearT)
 rslt=HSmod_test(init_fun,stan.data)
 N_Predict = rslt$N_Predict
 P_Predict = rslt$P_Predict
-PrdPredict = rslt$PrdPredict
-PrdAgPred = rslt$PrdAgPred
+PrPredict = rslt$PrPredict
+PrAgPred = rslt$PrAgPred
 Agepredict1 = rslt$Agepredict1 # Age dist for sample year 17 = 1967 (Agecomp row5)
 Agepredict2 = rslt$Agepredict2 # Age dist for sample year 69 = 2019 (Agecomp row48)
 HVp_predict = rslt$HVp_predict
@@ -171,15 +174,17 @@ ggplot(data.frame(Age=ages[3:8], Frequency= rowMeans(Agepredict1)),aes(x=Age,y=F
   geom_line() + geom_point(data=data.frame(Age=ages[3:8], Frequency= AgeComp[5,]/sum(AgeComp[5,])),aes(x=Age,y=Frequency))
 ggplot(data.frame(Age=ages[3:8], Frequency= rowMeans(Agepredict2)),aes(x=Age,y=Frequency)) +
   geom_line() + geom_point(data=data.frame(Age=ages[3:8], Frequency= AgeComp[48,]/sum(AgeComp[48,])),aes(x=Age,y=Frequency))
-ggplot(data.frame(Year=Year,Prt8yrPred = rowMeans(PrdPredict)),aes(x=Year,y=Prt8yrPred)) +
+ggplot(data.frame(Year=Year,Prt8yrPred = rowMeans(PrPredict)),aes(x=Year,y=Prt8yrPred)) +
   geom_line() + geom_point(data=df.Rep[df.Rep$Age==8,],aes(x=Year,y=Prob))
-ggplot(data.frame(Age=ages, Pregrate= rowMeans(PrdAgPred)),aes(x=Age,y=Pregrate)) +
+ggplot(data.frame(Age=ages, Pregrate= rowMeans(PrAgPred)),aes(x=Age,y=Pregrate)) +
   geom_line() + geom_point(data=df.Rep[df.Rep$Year<=1970,],aes(x=Age,y=Prob))
 ggplot(data.frame(Year=Year,HvPpred = rowMeans(HVp_predict)),aes(x=Year,y=HvPpred)) +
   geom_line() + geom_point(data=df.HV,aes(x=YEAR,y=PUPTOT))
 ggplot(data.frame(Year=Year,HvApred = rowMeans(HVa_predict)),aes(x=Year,y=HvApred)) +
   geom_line() + geom_point(data=df.HV,aes(x=YEAR,y=ADLTOT))
-sad = rslt$SAD
+#sad = rslt$SAD
+rm(rslt,N_Predict,P_Predict,PrPredict,PrAgPred,Agepredict1,
+   Agepredict2,HVp_predict,HVa_predict)
 #
 # Run JAGS to fit model---------------------------------------------
 if (fitoption ==1){
@@ -187,15 +192,15 @@ if (fitoption ==1){
             "dlta","psi1","psi2","PAmean","gammHp_mn","gammHa_mn",
             "N","gammHp","gammHa","epsF") #,
 }else{
-  params <- c("sigF","sigH","phiJ","phiF","b1","N0","dlta","psi1","psi2",
+  params <- c("sigF","sigH","phiJ","phiF","b1","N0","dlta","psi1","psi2","thta","aJ",
               "PAmean","gammHp_mn","gammHa_mn","Fc1966_prdct","Fc2016_prdct",
-              "N","gammHp","gammHa","epsF","HVp_pred","HVa_pred","PredPup",
-              "Fc8_prdct") #,
+              "N","gammHp","gammHa","HVp_pred","HVa_pred","PredPup",
+              "Fc8_prdct","epsF","gammHp","gammHa") #,
 }
 # "Tstat","Tstat_new","ppp","log_lik") # 
 #
-nsamples <- 500
-nburnin <- 500
+nsamples <- 300
+nburnin <- 300
 cores = detectCores()
 ncore = min(20,cores-1)
 #cl <- makeCluster(ncore)
@@ -230,5 +235,7 @@ traceplot(out, pars=c("gammHp_mn"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("gammHa_mn"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("dlta"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("psi1","psi2"), inc_warmup = F, nrow = 2)
+format(Sys.time(), "%b%d")
 
-save.image(file="./Results/FitHSmod3_Results_Jan16.rdata")
+save.image(file=paste0("./Results/FitHSmod",fitoption,"_Results_",
+                       format(Sys.time(), "%b%d"),".rdata"))

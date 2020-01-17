@@ -1,11 +1,21 @@
 HSmod_test <- function(init_fun,stan.data) {
   # create some counter variables: repeating year 1 20x to get sad correct
+  futuresim = 0 # (note: if this is a "futer sim", loaded data will update this)
+  thta = 1 # (NOTE if thta provided as fixed user input, it will replace this)
+  reps=100
+  for(i in 1:length(stan.data)){
+    ##first extract the object value
+    tempobj=stan.data[[i]]
+    ##now create a new variable with the original name of the list item
+    eval(parse(text=paste(names(stan.data)[[i]],"= tempobj")))
+  }
+  aA = Adhzpri
+  aJ = Jvhzpri   # Loop through random iterations of model
   iy = c(rep(1,20),seq(2,Nyrs-1))
   iz = numeric(length = length(iy)); iz[1:19] = 1
   # Create some arrays for saving results
-  reps = 100
-  PrdPredict = array(dim=c(Nyrs-1,reps))
-  PrdAgPred = array(dim=c(Nages,reps))
+  PrPredict = array(dim=c(Nyrs-1,reps))
+  PrAgPred = array(dim=c(Nages,reps))
   N_Predict = array(dim=c(Nyrs,reps))
   P_Predict = array(dim=c(Nyrs-1,reps))
   Agepredict1 = array(dim=c(NFages,reps))
@@ -13,15 +23,8 @@ HSmod_test <- function(init_fun,stan.data) {
   HVp_predict = array(dim=c(Nyrs-1,reps))
   HVa_predict = array(dim=c(Nyrs-1,reps))
   sadmean = array(dim = c(Nages,reps))
-  # Loop through random iterations of model
   for(r in 1:reps){
   pars = init_fun()
-  for(i in 1:length(stan.data)){
-    ##first extract the object value
-    tempobj=stan.data[[i]]
-    ##now create a new variable with the original name of the list item
-    eval(parse(text=paste(names(stan.data)[[i]],"= tempobj")))
-  }
   for(i in 1:length(pars)){
     ##first extract the object value
     tempobj=pars[[i]]
@@ -29,8 +32,6 @@ HSmod_test <- function(init_fun,stan.data) {
     eval(parse(text=paste(names(pars)[[i]],"= tempobj")))
   }
   # Initialize variables
-  aA = Adhzpri
-  aJ = Jvhzpri
   N = numeric(length = Nyrs)
   Nml = numeric(length = Nyrs)
   n = array(dim = c(Nages,Nyrs))
@@ -43,7 +44,7 @@ HSmod_test <- function(init_fun,stan.data) {
   FmAgeVec = array(dim = c(NFages,Nyrs-1))
   PredPup = numeric(length = Nyrs-1)
   PredPupA = array(dim = c(Nareas,Nyrs-1))
-  # Random assignmets
+  # Params, Random assignments
   epsF = rnorm(Nyrs-1,0,sigF)
   # epsJ = rnorm(Nyrs-1,0,sigJ)
   psi1 = rnorm(1,psipri1a,psipri1b)
@@ -51,16 +52,18 @@ HSmod_test <- function(init_fun,stan.data) {
   # Add some of the "observed" harvest patterns of major deviations
   gammHp = rnorm(Nyrs-1,gammHp_mn,sigH)
   gammHa = rnorm(Nyrs-1,gammHa_mn,sigH)
-  gammHp[1:4] = gammHp[1:4]*1.15
-  gammHp[5:21] = gammHp[5:21]*1.3
-  gammHp[33:45] = gammHp[33:45]*0.8
-  gammHp[46:58] = gammHp[46:58]*1
-  gammHp[59:69] = gammHp[59:69]*0.8
-  gammHa[1:4] = gammHa[1:4]*1.15
-  gammHa[5:21] = gammHa[5:21]*1.3
-  gammHa[33:45] = gammHa[33:45]*0.8
-  gammHa[46:58] = gammHa[46:58]*1
-  gammHa[59:69] = gammHa[59:69]*0.8
+  if (futuresim==0){
+    gammHp[1:4] = gammHp[1:4]*1.15
+    gammHp[5:21] = gammHp[5:21]*1.3
+    gammHp[33:45] = gammHp[33:45]*0.8
+    gammHp[46:58] = gammHp[46:58]*1
+    gammHp[59:69] = gammHp[59:69]*0.8
+    gammHa[1:4] = gammHa[1:4]*1.15
+    gammHa[5:21] = gammHa[5:21]*1.3
+    gammHa[33:45] = gammHa[33:45]*0.8
+    gammHa[46:58] = gammHa[46:58]*1
+    gammHa[59:69] = gammHa[59:69]*0.8
+  }
   PA = array(dim=c(3,Nyrs-1))
   for(i in 1:(Nyrs-1)){
     PA[1:3,i] = rdirichlet(1, PApri)
@@ -130,18 +133,23 @@ HSmod_test <- function(init_fun,stan.data) {
   }
   N_Predict[,r] = N  
   P_Predict[,r] = PredPup  
-  PrdPredict[,r] = Fc[8,]
-  PrdAgPred[,r] = Fc[1:8,1]
+  PrPredict[,r] = Fc[8,]
+  PrAgPred[,r] = Fc[1:8,1]
   # Age dist for sample years 17 = 1967, 69 = 2019
-  Agepredict1[,r] = FmAgeVec[,17]
-  Agepredict2[,r] = FmAgeVec[,69]
+  if(futuresim==0){
+    Agepredict1[,r] = FmAgeVec[,17]
+    Agepredict2[,r] = FmAgeVec[,69]    
+  }else{
+    Agepredict1[,r] = FmAgeVec[,1]
+    Agepredict2[,r] = FmAgeVec[,Nyrs-1]     
+  }
   HVp_predict[,r] = HVp_pred
   HVa_predict[,r] = HVa_pred
   sadmean[,r] = sad0
   }
   sadmn = rowMeans(sadmean)
-  results = list(N_Predict=N_Predict,P_Predict=P_Predict,PrdPredict=PrdPredict,
-                 Agepredict1=Agepredict1,Agepredict2=Agepredict2,PrdAgPred=PrdAgPred,
+  results = list(N_Predict=N_Predict,P_Predict=P_Predict,PrPredict=PrPredict,
+                 Agepredict1=Agepredict1,Agepredict2=Agepredict2,PrAgPred=PrAgPred,
                  HVp_predict=HVp_predict,HVa_predict=HVa_predict,SAD=sadmn)
   return(results)  
 }
