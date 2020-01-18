@@ -1,5 +1,5 @@
 # Script to plot some results from model fitting
-load(file="./Results/FitHSmod3_Results_Jan16.rdata")
+load(file="./Results/FitHSmod2_Results_Jan17.rdata")
 require(parallel)
 require(gtools)
 require(lattice)
@@ -149,7 +149,7 @@ print(pl6)
 futuresim = 1; Nyrs2 = 50; Yearst2 = 2020
 IC2 = matrix(0,nrow = Nyrs2,ncol=3); CE2 = rep(0,Nyrs2)
 #
-stan.data <- list(Nyrs=Nyrs2,N0pri=7000000,futuresim=futuresim,reps=500,
+stan.data <- list(Nyrs=Nyrs2,N0pri=1000000,futuresim=futuresim,reps=500,
                   NFages=NFages,NFage1=NFage1,Nages=Nages,Nareas=Nareas,
                   ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,DDadlt=DDadlt,
                   b0=b0,Adhzpri=Adhzpri,Jvhzpri=Jvhzpri,gamm0=gamm0,PApri=PApri) # thta=thta

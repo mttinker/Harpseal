@@ -33,7 +33,7 @@ data {
   int<lower=1> AgePRsmp[NPRobs];  // Age of each female pregnancy status sample
   real N0pri ;                    // prior estimate of starting abundance
   real gamm0;                     // Nuiscence param: base log hazards
-  // real thta;                      // theta param for theta-logistic density dependence
+  real thta;                      // theta param for theta-logistic density dependence
   real DDadlt[Nages] ;            // age-sepcific scaling factor for adult D-D 
   real<lower=0> b0;               // Fecundity: Logit of max adult pregancy rate
   real<lower=0> psipri1a ;        // Ice anomaly effect on pup survival, fxn param 1 mn
@@ -47,18 +47,18 @@ data {
 }
 transformed data {
   real aA;
-  //real aJ;
+  real aJ;
   aA = Adhzpri;
-  //aJ = Jvhzpri ;    
+  aJ = Jvhzpri ;    
 }
 // The parameters to be estimated 
 parameters {
   simplex[Nareas] PA[Nyrs-1] ;      // Annual proportional pup distribution across areas
-  real<lower=0> aJ;               // Juvenile survival hazard ratio
+  // real<lower=0> aJ;               // Juvenile survival hazard ratio
   // real<lower=0> aA;               // Adult survival hazard ratio, intercept
+  // real<lower=0> thta;             // theta parameter: controls "shape" of DD 
   real<lower=0> phiJ;             // Juvenile survival D-D effects 
   real<lower=0> phiF;             // Fecundity (preg rate) D-D effects
-  real<lower=0> thta;             // theta parameter: controls "shape" of DD
   real<lower=0> b1;               // Fecundity: age effect (reduced for younger)
   real<lower=0> psi1;             // Ice anomaly effect on pup survival, fxn param 1 
   real<lower=0> psi2;             // Ice anomaly effect on pup survival, fxn param 2 
@@ -186,12 +186,12 @@ model {
     PA[y] ~ dirichlet(PApri); 
   }  
   // Prior distributions for model parameters
-  aJ ~ normal(Jvhzpri,.75) ; 
+  // aJ ~ normal(Jvhzpri,.75) ; 
   // aA ~ normal(Adhzpri,0.5) ;
+  // thta ~ gamma(3,2) ;
   phiJ ~ cauchy(0,0.5) ;
   phiF ~ cauchy(0,0.5) ;
-  thta ~ gamma(3,2) ;
-  b1 ~ normal(0.25,0.1) ;
+  b1 ~ normal(0.2,0.1) ;
   psi1 ~ normal(psipri1a,psipri1b) ;
   psi2 ~ normal(psipri2a,psipri2b) ;
   dlta ~ cauchy(0,.25) ;
