@@ -2,6 +2,7 @@ HSmod_test <- function(init_fun,stan.data) {
   # create some counter variables: repeating year 1 20x to get sad correct
   futuresim = 0 # (note: if this is a "futer sim", loaded data will update this)
   thta = 2 # (NOTE if thta provided as fixed user input, it will replace this)
+  PAmeans = c(.18,.07,.75)
   reps=100
   for(i in 1:length(stan.data)){
     ##first extract the object value
@@ -9,8 +10,8 @@ HSmod_test <- function(init_fun,stan.data) {
     ##now create a new variable with the original name of the list item
     eval(parse(text=paste(names(stan.data)[[i]],"= tempobj")))
   }
-  aA = Adhzpri
-  aJ = Jvhzpri   # Loop through random iterations of model
+  gammA = Adloghz
+  gammJ = Jvloghz   # Loop through random iterations of model
   iy = c(rep(1,20),seq(2,Nyrs-1))
   iz = numeric(length = length(iy)); iz[1:19] = 1
   # Create some arrays for saving results
@@ -49,10 +50,12 @@ HSmod_test <- function(init_fun,stan.data) {
   # epsJ = rnorm(Nyrs-1,0,sigJ)
   psi1 = rnorm(1,psipri1a,psipri1b)
   psi2 = rnorm(1,psipri2a,psipri2b)
-  # Add some of the "observed" harvest patterns of major deviations
-  gammHp = rnorm(Nyrs-1,gammHp_mn,sigH)
-  gammHa = rnorm(Nyrs-1,gammHa_mn,sigH)
-  if (futuresim==0){
+  # Harvest mort: depends on type of scenario
+  if(futuresim==0){
+    # Level of harvest as observed
+    gammHp = rnorm(Nyrs-1,gammHp_mn,sigH)
+    gammHa = rnorm(Nyrs-1,gammHa_mn,sigH)
+    # Add some of the "observed" harvest patterns of major deviations
     gammHp[1:4] = gammHp[1:4]*1.15
     gammHp[5:21] = gammHp[5:21]*1.3
     gammHp[33:45] = gammHp[33:45]*0.8
@@ -63,10 +66,18 @@ HSmod_test <- function(init_fun,stan.data) {
     gammHa[33:45] = gammHa[33:45]*0.8
     gammHa[46:58] = gammHa[46:58]*1
     gammHa[59:69] = gammHa[59:69]*0.8
+  }else if(futuresim==1){
+    # No harvest (for estimating K)
+    gammHp = rep(0,Nyrs-1)
+    gammHa = rep(0,Nyrs-1)
+  }else{
+    # Find level of harvest meeting TAC criteria
+    gammHp = rnorm(Nyrs-1,gammHp_mn,sigH)
+    gammHa = rnorm(Nyrs-1,gammHa_mn,sigH)    
   }
   PA = array(dim=c(3,Nyrs-1))
   for(i in 1:(Nyrs-1)){
-    PA[1:3,i] = rdirichlet(1, PApri)
+    PA[1:3,i] = rdirichlet(1, 20*PAmeans)
   }
   N[1] = N0pri 
   Nml[1] = N[1]/1000000 
@@ -91,7 +102,7 @@ HSmod_test <- function(init_fun,stan.data) {
     Fc[1:2,i] = rep(0,2) 
     Fc[3:Nages,i] = inv.logit(b0 - b1 * (Nages-ages[3:Nages])^2 - (phiF*Nml[i])^thta + dlta*CE[i]*(Nml[i]) + epsF[i])
     #  Juvenile competing hazards and net realized survival
-    haz_J = exp(gamm0 + aJ + (phiJ*Nml[i])^thta) ; #  + epsJ[i]
+    haz_J = exp(gamm0 + gammJ + (phiJ*Nml[i])^thta) ; #  + epsJ[i]
     for(a in 1:Nareas){ 
       gammIce[a] = psi1 * (1/exp(IC[i,a]))^psi2 - 1 
       Sice[a,i] = exp(-1 * exp(gamm0 + gammIce[a])) 
@@ -102,7 +113,7 @@ HSmod_test <- function(init_fun,stan.data) {
     SJ[i] = exp(-1 * (haz_J + haz_I + haz_HVp)) 
     #  Adult competing hazards and net realized survival
     for (a in 1:Nages){
-      haz_A[a] = exp(gamm0 + aA + (DDadlt[a]*phiJ*Nml[i])^thta) 
+      haz_A[a] = exp(gamm0 + gammA + (DDadlt[a]*phiJ*Nml[i])^thta) 
     }
     haz_HVa = exp(gamm0 + gammHa[i]) 
     S[,i] = exp(-1 * (haz_A + haz_HVa))     
@@ -136,7 +147,7 @@ HSmod_test <- function(init_fun,stan.data) {
   PrPredict[,r] = Fc[8,]
   PrAgPred[,r] = Fc[1:8,1]
   # Age dist for sample years 17 = 1967, 69 = 2019
-  if(futuresim==0){
+  if(futuresim==0 & Nyrs>69){
     Agepredict1[,r] = FmAgeVec[,17]
     Agepredict2[,r] = FmAgeVec[,69]    
   }else{

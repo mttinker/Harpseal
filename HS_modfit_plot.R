@@ -1,5 +1,7 @@
 # Script to plot some results from model fitting
-load(file="./Results/FitHSmod2_Results_Jan17.rdata")
+# Load results file (if not already loaded into workspace):
+# load(file="./Results/FitHSmod2_Results_Jan19a.rdata")
+#
 require(parallel)
 require(gtools)
 require(lattice)
@@ -77,7 +79,7 @@ dp4$Obs[dp4$ObsSE==0] = NA
 dp4$ObsSE[dp4$ObsSE==0] = NA
 pl4 = ggplot(data=dp4,aes(x=Year,y=PRexp)) +
   geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) +
-  geom_line() + labs(x = "Year",y="Preganancy rate (AGe 8+)") +
+  geom_line() + labs(x = "Year",y="Preganancy rate (Age 8+)") +
   geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-ObsSE, ymax = Obs+ObsSE)) +
   ggtitle("Model estimated vs observed pregnancy rate over time") + theme_classic()
 print(pl4)
@@ -109,23 +111,17 @@ print(pl5)
 
 # Ice mortality -----------------------------------------------------------
 psi1mn = sumstats[startsWith(vns,"psi1")==T,1]  
-psi1sd = sumstats[startsWith(vns,"psi1")==T,2]  
+psi1sd = sumstats[startsWith(vns,"psi1")==T,3]  
 ps2mn = sumstats[startsWith(vns,"psi2")==T,1]  
-ps2sd = sumstats[startsWith(vns,"psi2")==T,2]  
+ps2sd = sumstats[startsWith(vns,"psi2")==T,3]  
 source("Ice_mort_plot.r")
-Ice_mort_plot(psipri1a,psipri1b,psipri2a,psipri2b)
+Ice_mort_plot(psi1mn,psi1sd,ps2mn,ps2sd)
 
 # Juvenile survival vs density --------------------------------------------
 NN = seq(.5,12,by=0.5)
 phiJ_mn = sumstats[which(startsWith(vns,"phiJ")),1]
 phiJ_sd = sumstats[which(startsWith(vns,"phiJ")),3]
 phiJr = rnorm(1000,phiJ_mn,phiJ_sd)
-#aJ_mn = sumstats[which(startsWith(vns,"aJ")),1]
-#aJ_sd = sumstats[which(startsWith(vns,"aJ")),3]
-#aJr = rnorm(1000,aJ_mn,aJ_sd)
-#thta_mn = sumstats[which(startsWith(vns,"thta")),1]
-#thta_sd = sumstats[which(startsWith(vns,"thta")),3]
-#thta_r = rnorm(1000,thta_mn,thta_sd)
 aJr = Jvhzpri # replace with vector from fitted estimate
 thta_r = thta # replace with vector from fitted estimate
 SJ = matrix(0,nrow = 1000,ncol=length(NN))
@@ -145,26 +141,36 @@ pl6 = ggplot(dp6, aes(x=Nmil,y=SJ_mean)) +
 print(pl6)
 #
 # Evaluate model sims-----------------------------------------------------
-# Simulate "new data sets" with or without harvest mort
-futuresim = 1; Nyrs2 = 50; Yearst2 = 2020
-IC2 = matrix(0,nrow = Nyrs2,ncol=3); CE2 = rep(0,Nyrs2)
+# Simulate future data with or without harvest mort
+futuresim = 1 # 0 = current level of harvest, 1 = no harvest (for estimating K)
+Nyrs2 = 50; Yearst2 = 2020 
+PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
+# Future conditions: sample ice and CE indices from after year YY 
+YY = 1969
+ii = which(df.CE$Year>=YY)
+CE2 = log(df.CE$CEindex[sample(ii,Nyrs2)])
+ii = which(df.Ice$Year>=YY)
+IC2 = as.matrix(cbind(df.Ice$Gulf_Anom[sample(ii,Nyrs2)],
+                      df.Ice$Gulf_Anom[sample(ii,Nyrs2)],
+                      df.Ice$Lab_Anom[sample(ii,Nyrs2)]))
 #
-stan.data <- list(Nyrs=Nyrs2,N0pri=1000000,futuresim=futuresim,reps=500,
+N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]
+stan.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=500,
+                  PAmeans=PAmeans,futuresim=futuresim,
                   NFages=NFages,NFage1=NFage1,Nages=Nages,Nareas=Nareas,
                   ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,DDadlt=DDadlt,
-                  b0=b0,Adhzpri=Adhzpri,Jvhzpri=Jvhzpri,gamm0=gamm0,PApri=PApri) # thta=thta
+                  b0pri=b0pri,Adloghz=Adloghz,Jvloghz=Jvloghz,gamm0=gamm0,thta=thta)
 init_fun <- function() {list(sigF=rnorm(1,sumstats[vns=="sigF",1],sumstats[vns=="sigF",2]),
                              sigH=rnorm(1,sumstats[vns=="sigH",1],sumstats[vns=="sigH",2]),
                              phiJ=rnorm(1,sumstats[vns=="phiJ",1],sumstats[vns=="phiJ",2]),
                              phiF=rnorm(1,sumstats[vns=="phiF",1],sumstats[vns=="phiF",2]),
+                             b0=rnorm(1,sumstats[vns=="b0",1],sumstats[vns=="b0",2]),
                              b1=rnorm(1,sumstats[vns=="b1",1],sumstats[vns=="b1",2]),
                              psi1=rnorm(1,sumstats[vns=="psi1",1],sumstats[vns=="psi1",2]),
                              psi2=rnorm(1,sumstats[vns=="psi2",1],sumstats[vns=="psi2",2]),
                              dlta=rnorm(1,sumstats[vns=="dlta",1],sumstats[vns=="dlta",2]),
-                             gammHp_mn = 0, gammHa_mn = 0
-                             # ADD AJ AND THTA
-                             #gammHp_mn=rnorm(1,sumstats[vns=="gammHp_mn",1],sumstats[vns=="gammHp_mn",2]),
-                             #gammHa_mn=rnorm(1,sumstats[vns=="gammHa_mn",1],sumstats[vns=="gammHa_mn",2])
+                             gammHp_mn=rnorm(1,sumstats[vns=="gammHp_mn",1],sumstats[vns=="gammHp_mn",2]),
+                             gammHa_mn=rnorm(1,sumstats[vns=="gammHa_mn",1],sumstats[vns=="gammHa_mn",2])
 )}
 #
 source("HSmod_test.r")
@@ -172,33 +178,26 @@ Year = seq(Yearst2,Yearst2+Nyrs2-2)
 Yearp = seq(Yearst2,Yearst2+Nyrs2-1)
 rslt=HSmod_test(init_fun,stan.data)
 N_Predict = rslt$N_Predict
-P_Predict = rslt$P_Predict
-PrPredict = rslt$PrPredict
-PrAgPred = rslt$PrAgPred
-Agepredict1 = rslt$Agepredict1 # Age dist for sample year 17 = 1967 (Agecomp row5)
-Agepredict2 = rslt$Agepredict2 # Age dist for sample year 69 = 2019 (Agecomp row48)
-HVp_predict = rslt$HVp_predict
-HVa_predict = rslt$HVa_predict
-Nfin = N_Predict[nrow(N_Predict),]
+Nfin = colMeans(N_Predict[(Nyrs2-10):Nyrs2,])
 Kest = mean(Nfin)
 Kest_sd = sd(Nfin)
 Kest_CI = quantile(Nfin, prob=c(0.025,0.975))
-
-ggplot(data.frame(Year=Yearp,Npred = rowMeans(N_Predict)),aes(x=Year,y=Npred)) +
-  geom_line()
-ggplot(data.frame(Year=Year,Ppred = rowMeans(P_Predict)),aes(x=Year,y=Ppred)) +
-  geom_line() + geom_point(data=df.Pup,aes(x=Year,y=Total_Npup))
-ggplot(data.frame(Age=ages[3:8], Frequency= rowMeans(Agepredict1)),aes(x=Age,y=Frequency)) +
-  geom_line() + geom_point(data=data.frame(Age=ages[3:8], Frequency= AgeComp[5,]/sum(AgeComp[5,])),aes(x=Age,y=Frequency))
-ggplot(data.frame(Age=ages[3:8], Frequency= rowMeans(Agepredict2)),aes(x=Age,y=Frequency)) +
-  geom_line() + geom_point(data=data.frame(Age=ages[3:8], Frequency= AgeComp[48,]/sum(AgeComp[48,])),aes(x=Age,y=Frequency))
-ggplot(data.frame(Year=Year,Prt8yrPred = rowMeans(PrPredict)),aes(x=Year,y=Prt8yrPred)) +
-  geom_line() + geom_point(data=df.Rep[df.Rep$Age==8,],aes(x=Year,y=Prob))
-ggplot(data.frame(Age=ages, Pregrate= rowMeans(PrAgPred)),aes(x=Age,y=Pregrate)) +
-  geom_line() + geom_point(data=df.Rep[df.Rep$Year<=1970,],aes(x=Age,y=Prob))
-ggplot(data.frame(Year=Year,HvPpred = rowMeans(HVp_predict)),aes(x=Year,y=HvPpred)) +
-  geom_line() + geom_point(data=df.HV,aes(x=YEAR,y=PUPTOT))
-ggplot(data.frame(Year=Year,HvApred = rowMeans(HVa_predict)),aes(x=Year,y=HvApred)) +
-  geom_line() + geom_point(data=df.HV,aes(x=YEAR,y=ADLTOT))
+dpNprd = data.frame(Year = Yearp, N_pred_mean = rowMeans(N_Predict),
+                    N_pred_lo = apply(N_Predict,1,quantile,prob=0.025),
+                    N_pred_hi = apply(N_Predict,1,quantile,prob=0.975))
+if (futuresim == 0){
+  titletxt = "Model projected abundance with current harvest levels"
+  subtxt = " "
+}else if (futuresim == 1){
+  titletxt = "Model projected abundance with zero harvest"
+  subtxt =  paste0("Estimated K = ", format(Kest/1000000,digits = 4),
+                            "million (", format(Kest_CI[1]/1000000,digits = 4),
+                            " - ", format(Kest_CI[2]/1000000,digits = 4),")")
+}
+plNprd = ggplot(data=dpNprd,aes(x=Year,y=N_pred_mean)) +
+  geom_ribbon(aes(ymin=N_pred_lo,ymax=N_pred_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Projected abundance") +
+  ggtitle(titletxt,subtitle =subtxt) + theme_classic()
+print(plNprd)
 
 

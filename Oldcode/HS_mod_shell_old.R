@@ -1,23 +1,24 @@
 # Shell script for fitting harp seal model
-# area (S.GSL, N.GSL, Front)
+#
 # User-set parameters--------------------------------------------------------
 #
-fitoption = 2  # option 1=fix N0, fit adlt Sx; option 2=fit N0, fix adlt Sx
+fitoption = 2 # option 1=fix N0, fit adlt Sx; option 2=fit N0, fix adlt Sx
 # Specify year range of time series for model fitting 
-Year1 = 1951   #  Year1 = first year that harvest data available
-YearT = 2020   #  YearT = year AFTER last available data for fitting
-Nareas = 3     # Number pupping areas (assume 3: S.GSL, N.GSL, Front)  
-# Prior for Initial Population size year 1 (model uses weak prior):
-N0pri = 1500000 # prior guess of starting pop size, default ~ 2 million
+Year1 = 1951; #  Year1 = first year that harvest data available
+YearT = 2020; #  YearT = year AFTER last available data for fitting
+# Initial Population size year 1, approximate guess and CV (for weak prior):
+N0pri = 2000000 # prior guess of starting pop size, default ~ 2 million
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
+# Priors for expected proportion of pups by area (S.GSL, N.GSL, Front):
+PApri = c(0.18,0.07,0.75) # (used for weak dirichlet prior) 
 # Priors for demographic params
-Adl_Sx = 0.94    # Adult survival with no harvest, low density (N~ 1 million)
-Juv_Sx = 0.82    # Juv survival with no harvest, low density (N~ 1 million)
-b0 = 2.5        # prior for logit of max adult pregancy rate (2.5 --> Fx=0.92)
-# Ice anomaly effects on pup survival:
+Adl_hz = 3.8    # Adult base log hazards : 4 --> Sx=0.95 with no harvest
+Juv_hz_rto = 2.5# ratio of juvenile hazard rate to adult hazard rate
+thta = 2        # "theta" for density-dependent "shape" (fitting suggests 2)
 psi1 = 4        # prior for psi param1 of ice anomaly effect fxn (see figure)
 psi2 = .8       # prior for psi param2 of ice anomaly effect fxn 
+b0 = 2.5        # prior for logit of max adult pregancy rate (2.5 --> Fx=0.92)
 #
 # End user params, plot ice mort prior---------------------------------------
 #
@@ -40,7 +41,6 @@ require(reshape2)
 require(rstan)
 require(stats)
 require(bayesplot)
-require(fitdistrplus)
 require(loo)
 # Set options for STAN
 options(mc.cores = parallel::detectCores())
@@ -51,6 +51,7 @@ source("Importdat.r")
 Yr0 = Year1-1;   
 Nyrs = YearT-Yr0 
 gamm0 = -7
+Nareas = 3
 Nages = 8
 ages = seq(1,Nages); ages2 = ages^2
 NFage1 = 3; # Youngest age of adults sampled for preg status
@@ -66,27 +67,29 @@ YrPRsmp = df.Rep$Year - Yr0
 AgePRsmp = df.Rep$Age
 sad0 = df.sad$SAD
 NP = numeric()
+NPA = matrix(nrow = length(which(!is.na(df.Pup$Sgulf_N))),ncol = Nareas)
 sdNP = numeric()
 YrPct = numeric()
-PAtag = numeric(length = Nyrs-1); 
-NPA = matrix(0,nrow = Nyrs-1,ncol = Nareas)
+YrPctA = numeric()
+c = 0; 
 aa = c(2,4,6)
 for (i in 1:nrow(df.Pup)){
   YrPct[i] = df.Pup$Year[i] - Yr0
   NP[i] = df.Pup$Total_Npup[i]
   sdNP[i] = min(df.Pup$Total_se[i],NP[i]*.2)
   if (!is.na(df.Pup$Sgulf_N[i])){
-    NPA[YrPct[i],1:Nareas] = as.numeric(df.Pup[i,aa]/sum(df.Pup[i,aa]) )
-    PAtag[YrPct[i]] = 1
+    c = c+1
+    NPA[c,1:Nareas] = as.numeric(df.Pup[i,aa])
+    YrPctA[c] = as.numeric(df.Pup[i,1] - Yr0)
+    # for (a in 1:3){
+    #   c = c+1
+    #   NPA[c] = as.numeric(df.Pup[i,aa[a]])
+    #   sdNPA[c] = as.numeric(df.Pup[i,aa[a]+1])
+    #   YrPctA[c] = as.numeric(df.Pup[i,1] - Yr0)
+    #   AreaPctA[c] = a
+    # }
   }
 }
-# Set priors for beta distributions of proportion pups in areas 1 & 2
-#  * proportion in area 3, PA3, can then be calculated as 1 - (PA1+PA2) *
-PApri = matrix(nrow = Nareas-1,ncol = 2)
-ft = fitdist(NPA[PAtag==1,1],"beta")
-PApri[1,1] = as.numeric(ft$estimate[1]); PApri[1,2] = as.numeric(ft$estimate[2]); 
-ft = fitdist(NPA[PAtag==1,2],"beta")
-PApri[2,1] = as.numeric(ft$estimate[1]); PApri[2,2] = as.numeric(ft$estimate[2]); 
 IC = matrix(0,nrow = Nyrs, ncol = 3)
 CE = numeric(length = Nyrs)
 HVp = numeric(length = Nyrs)
@@ -108,18 +111,12 @@ for (y in 1:Nyrs){
     HVa[y] = df.HV$ADLTOT[ii]
   }
 }
-# Calculate adult and juvenile base log hazards at low density 
-#  based on user-provided annual survival rate estimates
-thta = 1.5
-gmvals = seq(2,7,by=0.01)
-SAvals = exp(-1*(exp(gamm0 + gmvals + (.033*.23*1)^thta) + exp(gamm0)))
-SJvals = exp(-1*(exp(gamm0 + gmvals + (.23*1)^thta) + exp(gamm0) + exp(gamm0+.5)))
-Adloghz = gmvals[which(abs(SAvals-Adl_Sx)==min(abs(SAvals-Adl_Sx)))]
-Jvloghz = gmvals[which(abs(SJvals-Juv_Sx)==min(abs(SJvals-Juv_Sx)))]
-# scaled DD effects (relative to juv) for 1st 8 adult age classes:
-DDadlt = c(.25,.1,0,0,0,0,0,0) 
-b0pri = b0
-rm(i,ii,y,aa,ft) 
+FageAv = colMeans(AgeComp); FageAv = FageAv / sum(FageAv)
+PApri = 50*PApri
+DDadlt = c(.25,.1,0,0,0,0,0,0)
+Adhzpri = Adl_hz
+Jvhzpri = Adl_hz + log(Juv_hz_rto)
+rm(i,c,ii,y,aa) 
 #
 # Set up Jags inputs --------------------------------------------------------
 #
@@ -133,24 +130,23 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
                   NFobs=NFobs,NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
                   ages=ages,ages2=ages2,sad0=sad0,IC=IC,CE=CE,HVp=HVp,HVa=HVa,
                   NP=NP,NPA=NPA,sdNP=sdNP,AgeF=AgeComp,NFsamp=NFsamp,
-                  Nprg=Nprg,YrPct=YrPct,PAtag=PAtag,YrAGsmp=YrAGsmp,
+                  Nprg=Nprg,YrPct=YrPct,YrPctA=YrPctA,YrAGsmp=YrAGsmp,
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,DDadlt=DDadlt,psipri1a=psipri1a,
                   psipri1b=psipri1b,psipri2a=psipri2a,psipri2b=psipri2b,
-                  b0pri=b0pri,psi1=psi1,psi2=psi2,Adloghz=Adloghz,Jvloghz=Jvloghz,
-                  CV_HV=CV_HV,gamm0=gamm0,PApri=PApri,N0pri=N0pri) # ,thta=thta
+                  b0=b0,psi1=psi1,psi2=psi2,Adhzpri=Adhzpri,Jvhzpri=Jvhzpri,
+                  CV_HV=CV_HV,gamm0=gamm0,PApri=PApri,thta=thta,N0pri=N0pri) # 
 #
 init_fun <- function() {list(sigF=runif(1, .8, 1),
                              sigH=runif(1, .8, 1),
                              phiJ=runif(1, .22, .28),
                              phiF=runif(1, .26, .3),
-                             b0=runif(1, b0pri-.2, b0pri+.2),
                              b1=runif(1, .18, .2),
                              psi1=runif(1, psipri1a-1, psipri1a+1),
                              psi2=runif(1, psipri2a-.5, psipri2a+.5),
                              dlta=runif(1, .02, .05),
                              gammHp_mn=runif(1, 5.5, 6.2),
-                             gammHa_mn=runif(1, 3, 3.5),
-                             thta = runif(1, 1, 2)
+                             gammHa_mn=runif(1, 3, 3.5)
+                             # gammHp_mn = 0, gammHa_mn = 0
                              )}
 #
 # For testing inits-----------------------------------------------------
@@ -185,20 +181,20 @@ init_fun <- function() {list(sigF=runif(1, .8, 1),
 # ggplot(data.frame(Age=ages, Pregrate= rowMeans(PrAgPred)),aes(x=Age,y=Pregrate)) +
 #   geom_line() + geom_point(data=df.Rep[df.Rep$Year<=1970,],aes(x=Age,y=Prob))
 # 
-# # sad = rslt$SAD
+# #sad = rslt$SAD
 # rm(rslt,N_Predict,P_Predict,PrPredict,PrAgPred,Agepredict1,
 #    Agepredict2,HVp_predict,HVa_predict)
 #
 # Run JAGS to fit model---------------------------------------------
 if (fitoption ==1){
   params <- c("sigF","sigH","phiJ","phiF","b1","aJ","aA",
-            "dlta","psi1","psi2","gammHp_mn","gammHa_mn",
+            "dlta","psi1","psi2","PAmean","gammHp_mn","gammHa_mn",
             "N","gammHp","gammHa","epsF") #,
 }else{
-  params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","dlta",
-              "psi1","psi2","gammHp_mn","gammHa_mn","thta",
-              "N","PredPup","gammHp","gammHa","HVp_pred","HVa_pred",
-              "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","epsF","PA") #,
+  params <- c("sigF","sigH","phiJ","phiF","b1","N0","dlta","psi1","psi2",
+              "PAmean","gammHp_mn","gammHa_mn","Fc1966_prdct","Fc2016_prdct",
+              "N","gammHp","gammHa","HVp_pred","HVa_pred","PredPup",
+              "Fc8_prdct","epsF") #,
 }
 # "Tstat","Tstat_new","ppp","log_lik") # 
 #
@@ -232,12 +228,12 @@ vns = row.names(sumstats)
 
 traceplot(out, pars=c("sigF","sigH"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("b1"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("b0"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("phiF","phiJ"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("gammHp_mn"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("gammHa_mn"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("dlta"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("psi1","psi2"), inc_warmup = F, nrow = 2)
 
+format(Sys.time(), "%b%d")
 save.image(file=paste0("./Results/FitHSmod",fitoption,"_Results_",
-                       format(Sys.time(), "%b%d"),".rdata"))
+                       format(Sys.time(), "%b%d"),"a.rdata"))

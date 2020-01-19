@@ -18,47 +18,50 @@ data {
   simplex[Nages] sad0;            // vector of initial stable age distribution values
   real IC[Nyrs,Nareas];           // vector of annual ice anomaly values, by breeding area
   real CE[Nyrs];                  // array of annual environmental index values
-  real<lower=0> HVp[Nyrs];        // Combined harvest/bycatch values, beaters (age=1,YoY)
-  real<lower=0> HVa[Nyrs];        // Combined harvest/bycatch values, age>1 
-  real<lower=0> NP[NPcts];        // pup counts, total
-  int<lower=0> NPA[NPctsA,Nareas];// pup counts by area
-  real<lower=0> sdNP[NPcts];      // s.d. associated with total pup counts
   int<lower=0> AgeF[NFobs,NFages];// adult female samples, counts by age class 
   int<lower=0> NFsamp[NPRobs];    // Number females sampled for preg status (by year, age)  
   int<lower=0> Nprg[NPRobs];      // Number pregnant females per sample (by year, age)
+  real<lower=0> HVp[Nyrs];        // Combined harvest/bycatch values, beaters (age=1,YoY)
+  real<lower=0> HVa[Nyrs];        // Combined harvest/bycatch values, age>1 
+  real<lower=0> NP[NPcts];        // pup counts, total
+  real<lower=0> sdNP[NPcts];      // s.d. associated with total pup counts
   int<lower=1> YrPct[NPcts];      // Year of each pup count (total counts)
-  int<lower=1> YrPctA[NPctsA];    // Year of each pup count (area-specific)
+  int<lower=0> PAtag[Nyrs-1];     // switch variable: 1 on years w. area-specific counts   
+  matrix[Nyrs-1,Nareas] NPA;      // observed pup proportions by area & year 
   int<lower=1> YrAGsmp[NFobs];    // Year of each female age composition sample 
   int<lower=1> YrPRsmp[NPRobs];   // Year of each female pregnancy status sample 
   int<lower=1> AgePRsmp[NPRobs];  // Age of each female pregnancy status sample
   real N0pri ;                    // prior estimate of starting abundance
   real gamm0;                     // Nuiscence param: base log hazards
-  real thta;                      // theta param for theta-logistic density dependence
   real DDadlt[Nages] ;            // age-sepcific scaling factor for adult D-D 
-  real<lower=0> b0;               // Fecundity: Logit of max adult pregancy rate
+  real<lower=0> b0pri;            // Fecundity: Logit of max adult pregancy rate
   real<lower=0> psipri1a ;        // Ice anomaly effect on pup survival, fxn param 1 mn
   real<lower=0> psipri1b ;        // Ice anomaly effect on pup survival, fxn param 2 sd
   real<lower=0> psipri2a ;        // Ice anomaly effect on pup survival, fxn param 1 mn
   real<lower=0> psipri2b ;        // Ice anomaly effect on pup survival, fxn param 2 sd
-  vector<lower=0>[Nareas] PApri;  // prior estimate, proportional pup allocation by area
+  matrix[Nareas-1,2] PApri;    // beta prior estimates for proportional pups by area
   real CV_HV ;                    // CV associated with harvest counts
-  real Adhzpri ;                  // adult log hazard rate prior (FIXED value)
-  real Jvhzpri ;                  // juvenile log hazard rate prior
+  real Adloghz ;                  // adult log hazard rate prior (FIXED value)
+  real Jvloghz ;                  // juvenile log hazard rate prior
+  // real thta;                      // theta param for theta-logistic density dependence
 }
 transformed data {
-  real aA;
-  real aJ;
-  aA = Adhzpri;
-  aJ = Jvhzpri ;    
+  real gammA;
+  real gammJ;
+  gammA = Adloghz;
+  gammJ = Jvloghz ;    
 }
 // The parameters to be estimated 
 parameters {
-  simplex[Nareas] PA[Nyrs-1] ;      // Annual proportional pup distribution across areas
+  // Annual proportion of pups in areas 1 and 2, predicted
+  vector<lower=0,upper=0.45>[Nyrs-1] PA1 ; 
+  vector<lower=0,upper=0.45>[Nyrs-1] PA2 ; 
   // real<lower=0> aJ;               // Juvenile survival hazard ratio
   // real<lower=0> aA;               // Adult survival hazard ratio, intercept
-  // real<lower=0> thta;             // theta parameter: controls "shape" of DD 
+  real<lower=0> thta;             // theta parameter: controls "shape" of DD 
   real<lower=0> phiJ;             // Juvenile survival D-D effects 
   real<lower=0> phiF;             // Fecundity (preg rate) D-D effects
+  real<lower=0> b0 ;              // Fecundity: Logit of max adult pregancy rate
   real<lower=0> b1;               // Fecundity: age effect (reduced for younger)
   real<lower=0> psi1;             // Ice anomaly effect on pup survival, fxn param 1 
   real<lower=0> psi2;             // Ice anomaly effect on pup survival, fxn param 2 
@@ -76,6 +79,7 @@ parameters {
 }
 // Additional transformed parameters
 transformed parameters {
+  matrix[Nyrs-1,Nareas] PA;             // predicted pup proportions by area & year 
   real<lower=0> N[Nyrs] ;               // Population abundance by year
   real<lower=0> Nml[Nyrs] ;             // Population abundance by year in millions
   vector<lower=0>[Nages] n[Nyrs] ;      // Population vector, by year
@@ -87,7 +91,10 @@ transformed parameters {
   real<lower=0> HVa_pred[Nyrs-1] ;      // predicted harvest numbers by year, adults (age1+)
   vector<lower=0>[NFages] FmAgeVec[Nyrs-1] ; // Age comp vector for adult females ages 3 - 8+
   real<lower=0> PredPup[Nyrs-1] ;       // Predicted pups available for counting, by year
-  vector<lower=0>[Nareas] PredPupA[Nyrs-1];// Predicted pups in each area, by year
+  //vector<lower=0>[Nareas] PredPupA[Nyrs-1];// Predicted pups in each area, by year
+  PA[,1] = PA1;
+  PA[,2] = PA2;
+  PA[,3] = rep_vector(1,Nyrs-1) - (PA1 + PA2);
   N[1] = N0 ;
   Nml[1] = N[1]/1000000 ;
   n[1] = sad0 * N[1];
@@ -96,37 +103,45 @@ transformed parameters {
     // Declare some temporary variables for this year:
     real haz_J ;                  // Juv baseline hazards
     vector[Nages] haz_A ;         // Adult baseline hazards    
-    vector[Nareas] gammIce ;      // Area specific log hazards from ice
-    vector[Nareas] haz_I_A ;      // Area specific hazards from ice
+    row_vector[Nareas] gammIce ;  // Area specific log hazards from ice
+    row_vector[Nareas] haz_I_A ;  // Area specific hazards from ice
     real haz_I ;                  // Weighted mean ice hazards (juvenile)
     real haz_HVp ;                // Harvest hazards, juvenile  
     real haz_HVa ;                // Harvest hazards, adult     
     real prp_HV_p ;               // Proportion of mortality comprised of harvest, Juve 
     vector[Nages] prp_HV_a ;      // Proportion of mortality comprised of harvest, Adult 
-    vector[Nages] nt1;            // pop vector (temporary)
+    vector[Nages] nt1 ;           // pop vector (temporary)
+    row_vector[Nareas] PAi ;      // annual proportional pup allocation to area
+    row_vector[Nareas] PredPupA ; // annual number pups counted by area
+    // Use observed pup allocation for years available, otherwise use estimated
+    if (PAtag[i]==1){
+      PAi =  NPA[i,1:Nareas] ;
+    }else{
+      PAi =  PA[i,1:Nareas] ;
+    }
     // Fecundity (compared with observed pregnancy rate: adjust for abortions?)
     Fc[i][1:2] = rep_vector(0,2) ;
     Fc[i][3:Nages] = inv_logit(b0 - b1 * square(Nages-ages[3:Nages]) - pow(phiF*Nml[i],thta) 
                 + dlta*CE[i]*(Nml[i]) + epsF[i]) ;
     // Juvenile competing hazards and net realized survival
-    haz_J = exp(gamm0 + aJ + pow(phiJ*Nml[i], thta)) ; // + epsJ[i]
+    haz_J = exp(gamm0 + gammJ + pow(phiJ*Nml[i], thta)) ; // + epsJ[i]
     for(a in 1:Nareas){ 
        gammIce[a] = psi1 * pow((1/(IC[i,a] + 2)), psi2) ;
        Sice[i][a] = exp(-1 * exp(gamm0 + gammIce[a])) ;
        haz_I_A[a] = exp(gamm0 + gammIce[a]) ;
     } 
-    haz_I = sum(PA[i] .* haz_I_A);
+    haz_I = sum(PAi .* haz_I_A);
     haz_HVp = exp(gamm0 + gammHp[i]) ;
     SJ[i] = exp(-1 * (haz_J + haz_I + haz_HVp)) ;
     // Adult competing hazards and net realized survival
     for (a in 1:Nages){
-      haz_A[a] = exp(gamm0 + aA + pow(DDadlt[a]*phiJ*Nml[i],thta) ) ;
+      haz_A[a] = exp(gamm0 + gammA + pow(DDadlt[a]*phiJ*Nml[i],thta) ) ;
     }
     haz_HVa = exp(gamm0 + gammHa[i]) ;
     S[i] = exp(-1 * (haz_A + haz_HVa)) ;    
     // Calculations for proportional mortality from harvest
     prp_HV_p = haz_HVp / (haz_J + haz_I + haz_HVp) ;
-    HVp_pred[i] = sum((n[i] .* Fc[i]) * 0.5) * (1 - SJ[i]) * prp_HV_p ;
+    HVp_pred[i] = sum((n[i] .* Fc[i])) * 0.5 * (1 - SJ[i]) * prp_HV_p ;
     prp_HV_a = haz_HVa ./ (haz_A + haz_HVa) ;
     HVa_pred[i] = sum((n[i] .* (1 - S[i])) .* prp_HV_a) ;
     // Annual demographic transitions
@@ -141,9 +156,9 @@ transformed parameters {
     // Predicted Pups to be surveyed (allowing for some early season ice mortality), 
     //     by area and total, for year i 
     for (a in 1:Nareas){
-      PredPupA[i][a] = sum((n[i] .* Fc[i]) * 0.5 * PA[i][a] * sqrt(Sice[i][a])) ;
+      PredPupA[a] = sum((n[i] .* Fc[i])) * 0.5 * PAi[a] * sqrt(Sice[i][a]) ;
     }
-    PredPup[i] = sum(PredPupA[i]) ;
+    PredPup[i] = sum(PredPupA) ;
   }
 }
 // The model, parameters estimated by fitting to data
@@ -158,11 +173,6 @@ model {
   for (i in 1:NPcts){
     NP[i] ~ normal(PredPup[YrPct[i]], sdNP[i]) ;
   }
-  // Annual pup counts, by area: CHANGED TO MULTINOMIAL
-  for (i in 1:NPctsA){
-    NPA[i,] ~  multinomial(PA[YrPctA[i]]) ;
-    // NPA[i] ~ normal(PredPupA[YrPctA[i]][AreaPctA[i]], sdNPA[i]) ;
-  }  
   // Female age distributions (multinomial dist)
   for(i in 1:NFobs){
     AgeF[i,] ~ multinomial(FmAgeVec[YrAGsmp[i]]) ;
@@ -171,26 +181,26 @@ model {
   for(i in 1:NPRobs){
     Nprg[i] ~ binomial(NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
   }
+  //
   // Initial Population size (stochastic node, weak prior):
   N0 ~ gamma( square(N0pri)/square(N0pri*.25) , N0pri/square(N0pri*.25));  
   // Random effects: fecundity and Juv survival (env. stochasticity) 
   epsF ~ normal(0,sigF) ;
   // epsJ ~ normal(0,sigJ) ;
-  //
   // Annual harvest log hazard rates
   gammHp ~ normal(gammHp_mn,sigH);
   gammHa ~ normal(gammHa_mn,sigH);
-  // Annual proportional distribution of pupping across 3 areas 
-  //  (stochastic node, weak dirichlet prior) 
-  for (y in 1:(Nyrs-1)){
-    PA[y] ~ dirichlet(PApri); 
-  }  
+  // Estimated annual proportion of pups for areas 1 and 2 
+  //  for years not observed: Area 3 calculated as 1-(PA1+PA2) 
+  PA1 ~ beta(PApri[1,1],PApri[1,2]) ;
+  PA2 ~ beta(PApri[2,1],PApri[2,2]) ;
   // Prior distributions for model parameters
   // aJ ~ normal(Jvhzpri,.75) ; 
   // aA ~ normal(Adhzpri,0.5) ;
-  // thta ~ gamma(3,2) ;
+  thta ~ gamma(3,2) ;
   phiJ ~ cauchy(0,0.5) ;
   phiF ~ cauchy(0,0.5) ;
+  b0 ~ normal(b0pri,.5);
   b1 ~ normal(0.2,0.1) ;
   psi1 ~ normal(psipri1a,psipri1b) ;
   psi2 ~ normal(psipri2a,psipri2b) ;
@@ -198,8 +208,8 @@ model {
   // sigJ ~ cauchy(0,2.5) ;
   sigF ~ cauchy(0,2.5) ;
   sigH ~ cauchy(0,2.5) ;
-  gammHp_mn ~ normal(5.5,2) ;
-  gammHa_mn ~ normal(3,1.5) ;
+  gammHp_mn ~ normal(5.9,2) ;
+  gammHa_mn ~ normal(3.3,1.5) ;
 }
 // Derived params (e.g. goodness of fit stats)
 generated quantities {
@@ -221,9 +231,6 @@ generated quantities {
   }
   Fc1966_prdct = Fc[16][1:Nages];
   Fc2016_prdct = Fc[66][1:Nages];
-  for (a in 1:Nareas){
-     PAmean[a] = sum(PredPupA[1:(Nyrs-1)][a])/sum(PredPup[1:(Nyrs-1)]) ;
-  }
 //   c = 0 ;
 //   for (i in 1:NPcts){ 
 //     c = c+1 ;
