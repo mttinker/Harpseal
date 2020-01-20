@@ -1,5 +1,5 @@
 HSmod_test <- function(init_fun,stan.data) {
-  # create some counter variables: repeating year 1 20x to get sad correct
+  # Function to evaluate harp seal model
   futuresim = 0 # (note: if this is a "futer sim", loaded data will update this)
   thta = 2 # (NOTE if thta provided as fixed user input, it will replace this)
   PAmeans = c(.18,.07,.75)

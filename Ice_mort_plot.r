@@ -1,5 +1,5 @@
-# Plot effects of ice cover on pup mortality
 Ice_mort_plot <- function(psipri1a,psipri1b,psipri2a,psipri2b) {
+  # Function to Plot effects of ice cover on pup mortality
   require(ggplot2)
   gamm0 = -7
   Ice_cover = seq(-1,1,by=0.02)
