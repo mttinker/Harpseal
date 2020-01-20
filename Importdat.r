@@ -1,6 +1,5 @@
 # Import data
 require(readxl)
-
 df.sad = read.csv("./data/SAD0.csv", header=T)
 # CE index
 tmp = as.matrix(read.table("./data/CElindex.csv", sep=";", header=F))

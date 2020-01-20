@@ -1,11 +1,10 @@
 // HSmodfit
 // This Stan program describes a harp seal population model 
-//  [More explanation here] ** NOTE: make harvest an observed node! 
+//  [More explanation to go here] 
 //
 // Data inputs for model
 data {
   int<lower=1> NPcts;             // N counts of pups, total (across 3 areas)
-  int<lower=1> NPctsA;            // N counts of pups by area (Sglf, Nhglf, Front)
   int<lower=1> NFages;            // N female age classes (3 - 8+) for age composition obs 
   int<lower=1> NFage1;            // first age class for female age composition (default 3)
   int<lower=1> NFobs;             // N observations of age composition vectors
@@ -43,7 +42,6 @@ data {
   real CV_HV ;                    // CV associated with harvest counts
   real Adloghz ;                  // adult log hazard rate prior (FIXED value)
   real Jvloghz ;                  // juvenile log hazard rate prior
-  // real thta;                      // theta param for theta-logistic density dependence
 }
 transformed data {
   real gammA;
@@ -56,8 +54,6 @@ parameters {
   // Annual proportion of pups in areas 1 and 2, predicted
   vector<lower=0,upper=0.45>[Nyrs-1] PA1 ; 
   vector<lower=0,upper=0.45>[Nyrs-1] PA2 ; 
-  // real<lower=0> aJ;               // Juvenile survival hazard ratio
-  // real<lower=0> aA;               // Adult survival hazard ratio, intercept
   real<lower=0> thta;             // theta parameter: controls "shape" of DD 
   real<lower=0> phiJ;             // Juvenile survival D-D effects 
   real<lower=0> phiF;             // Fecundity (preg rate) D-D effects
@@ -67,17 +63,15 @@ parameters {
   real<lower=0> psi2;             // Ice anomaly effect on pup survival, fxn param 2 
   real<lower=100000> N0;          // Initial Abundance, year 1
   real dlta;                      // Effect of environmental conditions on fecundity
-  // real<lower=0> sigJ;             // Environmental stocasticity, var in juvenile survival
   real<lower=0> sigF;             // Environmental stocasticity, var in pregnancy rates
   real epsF[Nyrs-1];              // Stochastic effects on fecundity, by year
-  // real epsJ[Nyrs-1];              // Stochastic effects on juv survival, by year
   real<lower=0> sigH;             // Variance in Harvest log hazard rate
   real<lower=0> gammHp_mn ;       // Mean Harvest log hazard rate, Juvenile
   real<lower=0> gammHa_mn;        // Mean Harvest log hazard rate, Adult
   real gammHp[Nyrs-1];            // Annual harvest log hazard rate, Juvenile (beaters)
   real gammHa[Nyrs-1];            // Annual harvest log hazard rate, Adults (age 1+)
 }
-// Additional transformed parameters
+// Additional transformed parameters, including calculations for model dynamics
 transformed parameters {
   matrix[Nyrs-1,Nareas] PA;             // predicted pup proportions by area & year 
   real<lower=0> N[Nyrs] ;               // Population abundance by year
@@ -91,7 +85,6 @@ transformed parameters {
   real<lower=0> HVa_pred[Nyrs-1] ;      // predicted harvest numbers by year, adults (age1+)
   vector<lower=0>[NFages] FmAgeVec[Nyrs-1] ; // Age comp vector for adult females ages 3 - 8+
   real<lower=0> PredPup[Nyrs-1] ;       // Predicted pups available for counting, by year
-  //vector<lower=0>[Nareas] PredPupA[Nyrs-1];// Predicted pups in each area, by year
   PA[,1] = PA1;
   PA[,2] = PA2;
   PA[,3] = rep_vector(1,Nyrs-1) - (PA1 + PA2);
@@ -126,7 +119,7 @@ transformed parameters {
     // Juvenile competing hazards and net realized survival
     haz_J = exp(gamm0 + gammJ + pow(phiJ*Nml[i], thta)) ; // + epsJ[i]
     for(a in 1:Nareas){ 
-       gammIce[a] = psi1 * pow((1/(IC[i,a] + 2)), psi2) ;
+       gammIce[a] = psi1 * pow((1/exp(IC[i,a])), psi2) - 1 ;
        Sice[i][a] = exp(-1 * exp(gamm0 + gammIce[a])) ;
        haz_I_A[a] = exp(gamm0 + gammIce[a]) ;
     } 
@@ -161,7 +154,7 @@ transformed parameters {
     PredPup[i] = sum(PredPupA) ;
   }
 }
-// The model, parameters estimated by fitting to data
+// The model parameters, estimated by fitting to data
 model {
   // Observed nodes:
   // Harvest estimates
@@ -182,11 +175,11 @@ model {
     Nprg[i] ~ binomial(NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
   }
   //
+  //Prior distributions for model parameters:
   // Initial Population size (stochastic node, weak prior):
   N0 ~ gamma( square(N0pri)/square(N0pri*.25) , N0pri/square(N0pri*.25));  
   // Random effects: fecundity and Juv survival (env. stochasticity) 
   epsF ~ normal(0,sigF) ;
-  // epsJ ~ normal(0,sigJ) ;
   // Annual harvest log hazard rates
   gammHp ~ normal(gammHp_mn,sigH);
   gammHa ~ normal(gammHa_mn,sigH);
@@ -194,9 +187,7 @@ model {
   //  for years not observed: Area 3 calculated as 1-(PA1+PA2) 
   PA1 ~ beta(PApri[1,1],PApri[1,2]) ;
   PA2 ~ beta(PApri[2,1],PApri[2,2]) ;
-  // Prior distributions for model parameters
-  // aJ ~ normal(Jvhzpri,.75) ; 
-  // aA ~ normal(Adhzpri,0.5) ;
+  // key parameters of interest
   thta ~ gamma(3,2) ;
   phiJ ~ cauchy(0,0.5) ;
   phiF ~ cauchy(0,0.5) ;
@@ -205,7 +196,6 @@ model {
   psi1 ~ normal(psipri1a,psipri1b) ;
   psi2 ~ normal(psipri2a,psipri2b) ;
   dlta ~ cauchy(0,.25) ;
-  // sigJ ~ cauchy(0,2.5) ;
   sigF ~ cauchy(0,2.5) ;
   sigH ~ cauchy(0,2.5) ;
   gammHp_mn ~ normal(5.9,2) ;
@@ -217,43 +207,35 @@ generated quantities {
   real Fc8_prdct[Nyrs-1] ;  // Predicted fecundity rate for 8+ over years
   vector[Nages] Fc1966_prdct ;  // Predicted fecundity rate for all ages, 1966
   vector[Nages] Fc2016_prdct ;  // Predicted fecundity rate for all ages, 2016
-//   real log_lik[NPcts+NPctsA+NPRobs] ;    // Log liklihood of obs. data (for LooIC)
-//   real y_new[NPcts+NPctsA+NPRobs]  ;
-//   real P_resid[NPcts+NPctsA+NPRobs]  ;   // Pearson residuals from observed data
-//   real P_resid_new[NPcts+NPctsA+NPRobs]; // Pearson residuals from new data
-//   real Tstat ;      // Test stat for PPC (sum of squared pearson resids)
-//   real Tstat_new ;  // New data test stat (sum of squared pearson resids)
-//   real ppp ;        // Posterior predictive check Bayesian P-value
-//   real PAmean[Nareas] ;  /// mean PA values
-//   int<lower=0> c;
+  real log_lik[NPcts+NPRobs] ;    // Log liklihood of obs. data (for LooIC)
+  real y_new[NPcts+NPRobs]  ;
+  real P_resid[NPcts+NPRobs]  ;   // Pearson residuals from observed data
+  real P_resid_new[NPcts+NPRobs]; // Pearson residuals from new data
+  real Tstat ;      // Test stat for PPC (sum of squared pearson resids)
+  real Tstat_new ;  // New data test stat (sum of squared pearson resids)
+  real ppp ;        // Posterior predictive check Bayesian P-value
+  int<lower=0> c;
   for (i in 1:(Nyrs-1)){
     Fc8_prdct[i] = Fc[i][8] ;
   }
   Fc1966_prdct = Fc[16][1:Nages];
   Fc2016_prdct = Fc[66][1:Nages];
-//   c = 0 ;
-//   for (i in 1:NPcts){ 
-//     c = c+1 ;
-//     log_lik[c] = normal_lpdf(NP[i] | PredPup[YrPct[i]], sdNP[i]) ;
-//     y_new[c] = normal_rng(PredPup[YrPct[i]], sdNP[i]) ;
-//     P_resid[c] = (NP[i] - PredPup[YrPct[i]]) / sdNP[i];
-//     P_resid_new[c] = (y_new[c] - PredPup[YrPct[i]]) / sdNP[i];    
-//   }
-//   for (i in 1:NPctsA){
-//     c = c+1 ;
-//     log_lik[c] = normal_lpdf(NPA[i] | PredPupA[YrPctA[i]][AreaPctA[i]], sdNPA[i]) ;
-//     y_new[c] = normal_rng(PredPupA[YrPctA[i]][AreaPctA[i]], sdNPA[i]) ;
-//     P_resid[c] = (NPA[i] - PredPupA[YrPctA[i]][AreaPctA[i]]) / sdNPA[i];
-//     P_resid_new[c] = (y_new[c] - PredPupA[YrPctA[i]][AreaPctA[i]]) / sdNPA[i];
-//   }
-//   for(i in 1:NPRobs){
-//     c = c+1 ;
-//     log_lik[c] = binomial_lpmf( Nprg[i] | NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
-//     y_new[c] =  binomial_rng(NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
-//     P_resid[c] = (Nprg[i] - NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]) / sqrt(NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]*(1 - Fc[YrPRsmp[i]][AgePRsmp[i]])) ;
-//     P_resid_new[c] = (y_new[c] - NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]) / sqrt(NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]*(1 - Fc[YrPRsmp[i]][AgePRsmp[i]])) ;
-//   }
-//   Tstat = sum(square(P_resid));
-//   Tstat_new = sum(square(P_resid_new)) ;
-//   ppp = Tstat > Tstat_new ? 1 : 0;
+  c = 0 ;
+  for (i in 1:NPcts){
+    c = c+1 ;
+    log_lik[c] = normal_lpdf(NP[i] | PredPup[YrPct[i]], sdNP[i]) ;
+    y_new[c] = normal_rng(PredPup[YrPct[i]], sdNP[i]) ;
+    P_resid[c] = (NP[i] - PredPup[YrPct[i]]) / sdNP[i];
+    P_resid_new[c] = (y_new[c] - PredPup[YrPct[i]]) / sdNP[i];
+  }
+  for(i in 1:NPRobs){
+    c = c+1 ;
+    log_lik[c] = binomial_lpmf( Nprg[i] | NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
+    y_new[c] =  binomial_rng(NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
+    P_resid[c] = (Nprg[i] - NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]) / sqrt(NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]*(1 - Fc[YrPRsmp[i]][AgePRsmp[i]])) ;
+    P_resid_new[c] = (y_new[c] - NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]) / sqrt(NFsamp[i]*Fc[YrPRsmp[i]][AgePRsmp[i]]*(1 - Fc[YrPRsmp[i]][AgePRsmp[i]])) ;
+  }
+  Tstat = sum(square(P_resid));
+  Tstat_new = sum(square(P_resid_new)) ;
+  ppp = Tstat > Tstat_new ? 1 : 0;
 }

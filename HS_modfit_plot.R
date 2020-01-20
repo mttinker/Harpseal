@@ -1,6 +1,6 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):
-# load(file="./Results/FitHSmod2_Results_Jan19a.rdata")
+load(file="./Results/FitHSmod_Results_Jan19b.rdata")
 #
 require(parallel)
 require(gtools)
@@ -19,11 +19,22 @@ Yearp = seq(Year1,Year1+Nyrs-1)
 dp1 = data.frame(Year=Yearp,Nexp=sumstats[startsWith(vns,"N[")==T,1],
                  N_lo = sumstats[startsWith(vns,"N[")==T,4],
                  N_hi = sumstats[startsWith(vns,"N[")==T,8])
-pl1 = ggplot(data=dp1,aes(x=Year,y=Nexp)) +
+
+dp1$N2exp = c(dp1$Nexp[1:(Nyrs-1)] + sumstats[startsWith(vns,"PredPup[")==T,1],NA)
+dp1$N2_lo = c(dp1$N_lo[1:(Nyrs-1)] + sumstats[startsWith(vns,"PredPup[")==T,4],NA)
+dp1$N2_hi = c(dp1$N_hi[1:(Nyrs-1)] + sumstats[startsWith(vns,"PredPup[")==T,8],NA)
+
+pl1 = ggplot(data=dp1[1:(Nyrs-1),],aes(x=Year,y=Nexp)) +
       geom_ribbon(aes(ymin=N_lo,ymax=N_hi),alpha=0.3) +
-      geom_line() + labs(x = "Year",y="Estimated abundance") +
-      ggtitle("Model estimated abundance") + theme_classic()
+      geom_line() + labs(x = "Year",y="Estimated abundance w/o pups") +
+      ggtitle("Model estimated abundance (excluding pups)") + theme_bw()
 print(pl1)
+pl1b = ggplot(data=dp1[1:(Nyrs-1),],aes(x=Year,y=N2exp)) +
+  geom_ribbon(aes(ymin=N2_lo,ymax=N2_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Estimated abundance with pups") +
+  ggtitle("Model estimated abundance (including pups)") + theme_bw() 
+print(pl1b)
+#
 # Pup counts ----------------------------------------------------------------
 dp2 = data.frame(Year=Year,Pexp=sumstats[startsWith(vns,"PredPup[")==T,1],
                  P_lo = sumstats[startsWith(vns,"PredPup[")==T,4],
@@ -35,33 +46,49 @@ for (i in 1:nrow(df.Pup)){
   dp2$Obs[ii] = df.Pup$Total_Npup[i]
   dp2$ObsSE[ii] = df.Pup$Total_se[i]
 }
+dp2$Obs[dp2$ObsSE==0] = NA
+dp2$ObsSE[dp2$ObsSE==0] = NA
 pl2 = ggplot(data=dp2,aes(x=Year,y=Pexp)) +
   geom_ribbon(aes(ymin=P_lo,ymax=P_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Pup counts (total)") +
-  geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-ObsSE, ymax = Obs+ObsSE)) +
+  geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-1.96*ObsSE, ymax = Obs+1.96*ObsSE)) +
   ggtitle("Model estimated vs observed pup counts") + theme_classic()
 print(pl2)
+#
 # Preg rate by age----------------------------------------------------------
+PR1966 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][16]
+PR1966per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][1:32],na.rm = T)
+crct1 = PR1966per/PR1966
+PR2016 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][66]
+PR2016per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][50:69],na.rm = T)
+crct2 = PR2016per/PR2016
+
 dp3 = data.frame(Age=ages, Year = (rep(1966,Nages)),
-                 PRexp=sumstats[startsWith(vns,"Fc1966_prdct[")==T,1],
-                 PR_lo = sumstats[startsWith(vns,"Fc1966_prdct[")==T,4],
-                 PR_hi = sumstats[startsWith(vns,"Fc1966_prdct[")==T,8])
+                 PRexp=sumstats[startsWith(vns,"Fc1966_prdct[")==T,1]*crct1,
+                 PR_lo = sumstats[startsWith(vns,"Fc1966_prdct[")==T,4]*crct1,
+                 PR_hi = sumstats[startsWith(vns,"Fc1966_prdct[")==T,8]*crct1)
 dp3 = rbind(dp3, data.frame(Age=ages, Year = (rep(2016,Nages)),
-                 PRexp=sumstats[startsWith(vns,"Fc2016_prdct[")==T,1],
-                 PR_lo = sumstats[startsWith(vns,"Fc2016_prdct[")==T,4],
-                 PR_hi = sumstats[startsWith(vns,"Fc2016_prdct[")==T,8]))
+                 PRexp=sumstats[startsWith(vns,"Fc2016_prdct[")==T,1]*crct2,
+                 PR_lo = sumstats[startsWith(vns,"Fc2016_prdct[")==T,4]*crct2,
+                 PR_hi = sumstats[startsWith(vns,"Fc2016_prdct[")==T,8]*crct2))
 dp3$Obs = numeric(length = nrow(dp3))
+dp3$ObsSE = numeric(length = nrow(dp3))
 for (i in 1:nrow(dp3)){
-  ii = which(df.Rep$Age==dp3$Age[i] & df.Rep$Year==dp3$Year[i] & df.Rep$Year==dp3$Year[i])
-  dp3$Obs[i] = median(df.Rep$Prob[ii])
+  ii = which(df.Rep$Age==dp3$Age[i] & df.Rep$Year>(dp3$Year[i]-20) & 
+               df.Rep$Year<(dp3$Year[i]+20))
+  dp3$Obs[i] = mean(df.Rep$Prob[ii])
+  dp3$ObsSE[i] = sd(df.Rep$Prob[ii])/sqrt(length(df.Rep$Prob[ii]))
 }
 dp3$Year = as.factor(dp3$Year)
 pl3 = ggplot(data=dp3,aes(x=Age,y=PRexp,group=Year,color = Year, fill=Year)) +
   geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) + ylim(0,1) +
   geom_line() + labs(x = "Age",y="Pregnancy rate") +
   geom_point(aes(y=Obs),size=2) +
-  ggtitle("Model estimated vs observed pregancy rate, by age") + theme_classic()
+  geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
+                      ymax = Obs+1.96*ObsSE),width=.2) +
+  ggtitle("Model estimated vs observed pregancy rates by age (early vs late time series)") + theme_classic()
 print(pl3)
+#
 # Preg rate 8+ over time----------------------------------------------------
 dp4 = data.frame(Year=Year,PRexp=sumstats[startsWith(vns,"Fc8_prdct[")==T,1],
                  PR_lo = sumstats[startsWith(vns,"Fc8_prdct[")==T,4],
@@ -80,9 +107,11 @@ dp4$ObsSE[dp4$ObsSE==0] = NA
 pl4 = ggplot(data=dp4,aes(x=Year,y=PRexp)) +
   geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Preganancy rate (Age 8+)") +
-  geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-ObsSE, ymax = Obs+ObsSE)) +
+  geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
+                                             ymax = Obs+1.96*ObsSE),color="darkgrey") +
   ggtitle("Model estimated vs observed pregnancy rate over time") + theme_classic()
 print(pl4)
+#
 # Harvest mortality over time ---------------------------------------------
 dp5 = data.frame(Year=Year, Group = rep("Beaters",length(Year)),
                  HVexp=sumstats[startsWith(vns,"HVp_pred[")==T,1],
@@ -106,39 +135,61 @@ pl5 = ggplot(data=dp5,aes(x=Year,y=HVexp,group=Group,color = Group, fill=Group))
   geom_ribbon(aes(ymin=HV_lo,ymax=HV_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Total harvest + bycatch") +
   geom_point(aes(y=Obs),size=2) +
-  ggtitle("Model estimated vs observed harvest mortality, by age class") + theme_classic()
+  ggtitle("Model estimated vs observed harvest/bycatch mortality, by age class") + theme_classic()
 print(pl5)
-
-# Ice mortality -----------------------------------------------------------
+#
+# Ice anomaly effect on pup survival---------------------------------------
 psi1mn = sumstats[startsWith(vns,"psi1")==T,1]  
 psi1sd = sumstats[startsWith(vns,"psi1")==T,3]  
 ps2mn = sumstats[startsWith(vns,"psi2")==T,1]  
 ps2sd = sumstats[startsWith(vns,"psi2")==T,3]  
 source("Ice_mort_plot.r")
-Ice_mort_plot(psi1mn,psi1sd,ps2mn,ps2sd)
-
+plIce = Ice_mort_plot(psi1mn,psi1sd,ps2mn,ps2sd)
+print(plIce)
+#
+# Fecundity vs density ----------------------------------------------------
+NN = seq(.2,5,by=0.1)
+iir = sample(Nsims,1000)
+b0_r = mcmc[iir,vn=="b0"]
+phiF_r = mcmc[iir,vn=="phiF"]
+thta_r = mcmc[iir,vn=="thta"]
+FC = matrix(0,nrow = 1000,ncol=length(NN))
+FC_mean = numeric(length = 40)
+FC_lo = numeric(length = 40)
+FC_hi = numeric(length = 40)
+for(r in 1:1000){
+  FC[r,] = inv.logit(b0_r[r] - phiF_r[r]*NN^thta_r[r])
+}
+FC_mean = colMeans(FC)
+FC_lo = apply(FC, 2, quantile, prob=0.055)
+FC_hi = apply(FC, 2, quantile, prob=0.95)
+dp6 = data.frame(Nmil = NN, Fecundity = FC_mean,
+                 FC_lo = FC_lo, FC_hi = FC_hi)
+pl6 = ggplot(dp6, aes(x=Nmil,y=Fecundity)) +
+  geom_ribbon(aes(ymin=FC_lo,ymax=FC_hi),alpha=0.3) +
+  geom_line() + labs(x = "Abundance (millions), w/o pups",y="Pregnancy rate (8+)") +
+  ggtitle("Density-dependent variation in adult fecundity") + theme_classic()
+print(pl6)
+#
 # Juvenile survival vs density --------------------------------------------
-NN = seq(.5,12,by=0.5)
-phiJ_mn = sumstats[which(startsWith(vns,"phiJ")),1]
-phiJ_sd = sumstats[which(startsWith(vns,"phiJ")),3]
-phiJr = rnorm(1000,phiJ_mn,phiJ_sd)
-aJr = Jvhzpri # replace with vector from fitted estimate
-thta_r = thta # replace with vector from fitted estimate
+NN = seq(.2,10,by=0.1)
+aJr = Jvloghz 
+phiJ_r = mcmc[iir,vn=="phiJ"]
 SJ = matrix(0,nrow = 1000,ncol=length(NN))
 for(r in 1:1000){
-  haz_J = exp(gamm0 + aJr + ( phiJr[r] *NN)^thta_r)  
-  SJ[r,] = exp(-1 * (haz_J + exp(gamm0+1) + exp(gamm0)))
+  haz_J = exp(gamm0 + aJr + ( phiJ_r[r] *NN)^thta_r[r])  
+  SJ[r,] = exp(-1 * (haz_J + exp(gamm0+.5) + exp(gamm0)))
 }
 SJ_mean = colMeans(SJ)
 SJ_lo = apply(SJ, 2, quantile, prob=0.025)
 SJ_hi = apply(SJ, 2, quantile, prob=0.975)
-dp6 = data.frame(Nmil = NN, S_j = SJ_mean,
+dp7 = data.frame(Nmil = NN, S_j = SJ_mean,
                  S_lo = SJ_lo, S_hi = SJ_hi)
-pl6 = ggplot(dp6, aes(x=Nmil,y=SJ_mean)) +
+pl7 = ggplot(dp7, aes(x=Nmil,y=SJ_mean)) +
   geom_ribbon(aes(ymin=SJ_lo,ymax=S_hi),alpha=0.3) +
-  geom_line() + labs(x = "Abundance (millions)",y="Juvenile survival rate") +
+  geom_line() + labs(x = "Abundance (millions), w/o pups",y="Juvenile survival rate") +
   ggtitle("Density-dependent variation in juvenile survival") + theme_classic()
-print(pl6)
+print(pl7)
 #
 # Evaluate model sims-----------------------------------------------------
 # Simulate future data with or without harvest mort
@@ -159,13 +210,14 @@ stan.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=500,
                   PAmeans=PAmeans,futuresim=futuresim,
                   NFages=NFages,NFage1=NFage1,Nages=Nages,Nareas=Nareas,
                   ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,DDadlt=DDadlt,
-                  b0pri=b0pri,Adloghz=Adloghz,Jvloghz=Jvloghz,gamm0=gamm0,thta=thta)
+                  b0pri=b0pri,Adloghz=Adloghz,Jvloghz=Jvloghz,gamm0=gamm0) #thta=thta
 init_fun <- function() {list(sigF=rnorm(1,sumstats[vns=="sigF",1],sumstats[vns=="sigF",2]),
                              sigH=rnorm(1,sumstats[vns=="sigH",1],sumstats[vns=="sigH",2]),
                              phiJ=rnorm(1,sumstats[vns=="phiJ",1],sumstats[vns=="phiJ",2]),
                              phiF=rnorm(1,sumstats[vns=="phiF",1],sumstats[vns=="phiF",2]),
                              b0=rnorm(1,sumstats[vns=="b0",1],sumstats[vns=="b0",2]),
                              b1=rnorm(1,sumstats[vns=="b1",1],sumstats[vns=="b1",2]),
+                             thta=rnorm(1,sumstats[vns=="thta",1],sumstats[vns=="thta",2]),
                              psi1=rnorm(1,sumstats[vns=="psi1",1],sumstats[vns=="psi1",2]),
                              psi2=rnorm(1,sumstats[vns=="psi2",1],sumstats[vns=="psi2",2]),
                              dlta=rnorm(1,sumstats[vns=="dlta",1],sumstats[vns=="dlta",2]),
@@ -199,5 +251,47 @@ plNprd = ggplot(data=dpNprd,aes(x=Year,y=N_pred_mean)) +
   geom_line() + labs(x = "Year",y="Projected abundance") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plNprd)
+
+# # Environmental index effect on fecundity----------------------------------
+# NN = c(1,3)
+# CEi = seq(.5,12,length.out = 20); CEi = log(CEi)
+# # inv_logit(b0 - phiF*Nml[i]^thta + dlta*log(CEi)*(Nml[i]))
+# b0_mn = sumstats[which(startsWith(vns,"b0")),1]
+# b0_sd = sumstats[which(startsWith(vns,"b0")),3]
+# b0_r = rnorm(1000,b0_mn,b0_sd)
+# phiF_mn = sumstats[which(startsWith(vns,"phiF")),1]
+# phiF_sd = sumstats[which(startsWith(vns,"phiF")),3]
+# phiF_r = rnorm(1000,phiF_mn,phiF_sd)
+# thta_mn = sumstats[which(startsWith(vns,"thta")),1]
+# thta_sd = sumstats[which(startsWith(vns,"thta")),3]
+# thta_r = rnorm(1000,thta_mn,thta_sd) # replace with vector from fitted estimate
+# dlta_mn = sumstats[which(startsWith(vns,"dlta")),1]
+# dlta_sd = sumstats[which(startsWith(vns,"dlta")),2]
+# dlta_r = rnorm(1000,dlta_mn,dlta_sd)
+# FC = matrix(0,nrow = 2000,ncol=length(CEi))
+# FC_mean = numeric(length = 40)
+# FC_lo = numeric(length = 40)
+# FC_hi = numeric(length = 40)
+# for (i in 1:2){
+#   FC = matrix(0,nrow = 1000,ncol=20)
+#   for(r in 1:1000){
+#     FC[r,] = inv.logit(b0_r[r] - phiF_r[r]*NN[i]^thta_r[r] + 
+#                          dlta_r[r]*CEi*(NN[i]))
+#   }
+#   FC_mean[(20*(i-1)+1):(20*(i-1)+20)] = colMeans(FC)
+#   FC_lo[(20*(i-1)+1):(20*(i-1)+20)] = apply(FC, 2, quantile, prob=0.1)
+#   FC_hi[(20*(i-1)+1):(20*(i-1)+20)] = apply(FC, 2, quantile, prob=0.9)
+# }
+# dp6 = data.frame(Nmil = rep(NN,1,each=20),
+#                  Abundance = rep(c("Low","High"),1,each=20),
+#                  CE_index = rep(CEi,2),
+#                  FC_mean = FC_mean,
+#                  FC_lo = FC_lo, FC_hi = FC_hi)
+# dp6$Abundance = as.factor(dp6$Abundance)
+# pl6 = ggplot(dp6, aes(x=CE_index,y=FC_mean,group=Abundance,color = Abundance, fill=Abundance)) +
+#   geom_ribbon(aes(ymin=FC_lo,ymax=FC_hi),alpha=0.3) +
+#   geom_line() + labs(x = "Environmental Index (CE)",y="Pregnancy rate (8+)") +
+#   ggtitle("Effect of Environment and Density on Adult Fecundity") + theme_classic()
+# print(pl6)
 
 

@@ -1,8 +1,8 @@
 # Shell script for fitting harp seal model
-# area (S.GSL, N.GSL, Front)
+#   NOTE: 3 pupping areas: S.GSL, N.GSL, Front
+#
 # User-set parameters--------------------------------------------------------
 #
-fitoption = 2  # option 1=fix N0, fit adlt Sx; option 2=fit N0, fix adlt Sx
 # Specify year range of time series for model fitting 
 Year1 = 1951   #  Year1 = first year that harvest data available
 YearT = 2020   #  YearT = year AFTER last available data for fitting
@@ -12,8 +12,8 @@ N0pri = 1500000 # prior guess of starting pop size, default ~ 2 million
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
 # Priors for demographic params
-Adl_Sx = 0.94    # Adult survival with no harvest, low density (N~ 1 million)
-Juv_Sx = 0.82    # Juv survival with no harvest, low density (N~ 1 million)
+Adl_Sx = 0.94    # Adult base survival (no harvest), low density (N~ 1 million)
+Juv_Sx = 0.82    # Juvenile base survival (no harvest), low density (N~ 1 million)
 b0 = 2.5        # prior for logit of max adult pregancy rate (2.5 --> Fx=0.92)
 # Ice anomaly effects on pup survival:
 psi1 = 4        # prior for psi param1 of ice anomaly effect fxn (see figure)
@@ -41,7 +41,8 @@ require(rstan)
 require(stats)
 require(bayesplot)
 require(fitdistrplus)
-require(loo)
+require(readxl)
+# require(loo)
 # Set options for STAN
 options(mc.cores = parallel::detectCores())
 rstan_options(auto_write = TRUE)
@@ -81,7 +82,7 @@ for (i in 1:nrow(df.Pup)){
   }
 }
 # Set priors for beta distributions of proportion pups in areas 1 & 2
-#  * proportion in area 3, PA3, can then be calculated as 1 - (PA1+PA2) *
+#  * proportion in area 3, PA3, is then be calculated as 1 - (PA1+PA2) *
 PApri = matrix(nrow = Nareas-1,ncol = 2)
 ft = fitdist(NPA[PAtag==1,1],"beta")
 PApri[1,1] = as.numeric(ft$estimate[1]); PApri[1,2] = as.numeric(ft$estimate[2]); 
@@ -108,12 +109,12 @@ for (y in 1:Nyrs){
     HVa[y] = df.HV$ADLTOT[ii]
   }
 }
-# Calculate adult and juvenile base log hazards at low density 
+# Calculate adult and juvenile base log hazards at low densities, 
 #  based on user-provided annual survival rate estimates
-thta = 1.5
+thta = 2.5
 gmvals = seq(2,7,by=0.01)
-SAvals = exp(-1*(exp(gamm0 + gmvals + (.033*.23*1)^thta) + exp(gamm0)))
-SJvals = exp(-1*(exp(gamm0 + gmvals + (.23*1)^thta) + exp(gamm0) + exp(gamm0+.5)))
+SAvals = exp(-1*(exp(gamm0 + gmvals + (.033*.22*1)^thta) + exp(gamm0)))
+SJvals = exp(-1*(exp(gamm0 + gmvals + (.22*1)^thta) + exp(gamm0) + exp(gamm0+.5)))
 Adloghz = gmvals[which(abs(SAvals-Adl_Sx)==min(abs(SAvals-Adl_Sx)))]
 Jvloghz = gmvals[which(abs(SJvals-Juv_Sx)==min(abs(SJvals-Juv_Sx)))]
 # scaled DD effects (relative to juv) for 1st 8 adult age classes:
@@ -123,11 +124,7 @@ rm(i,ii,y,aa,ft)
 #
 # Set up Jags inputs --------------------------------------------------------
 #
-if (fitoption==1){
-  fitmodel = c("HSmodfitv1.stan")
-}else{
-  fitmodel = c("HSmodfitv2.stan")
-}
+fitmodel = c("HSmodfit.stan")
 #  
 stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
                   NFobs=NFobs,NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
@@ -190,17 +187,11 @@ init_fun <- function() {list(sigF=runif(1, .8, 1),
 #    Agepredict2,HVp_predict,HVa_predict)
 #
 # Run JAGS to fit model---------------------------------------------
-if (fitoption ==1){
-  params <- c("sigF","sigH","phiJ","phiF","b1","aJ","aA",
-            "dlta","psi1","psi2","gammHp_mn","gammHa_mn",
-            "N","gammHp","gammHa","epsF") #,
-}else{
-  params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","dlta",
-              "psi1","psi2","gammHp_mn","gammHa_mn","thta",
-              "N","PredPup","gammHp","gammHa","HVp_pred","HVa_pred",
-              "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","epsF","PA") #,
-}
-# "Tstat","Tstat_new","ppp","log_lik") # 
+params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","dlta",
+            "psi1","psi2","gammHp_mn","gammHa_mn","thta",
+            "N","PredPup","gammHp","gammHa","HVp_pred","HVa_pred",
+            "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","epsF",
+            "Tstat","Tstat_new","ppp","log_lik") # 
 #
 nsamples <- 500
 nburnin <- 500
