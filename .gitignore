@@ -1,4 +1,7 @@
 data/
 Results/
 Oldcode/
+HSmodel.Rproj
+.Rhistory
+HSmodfit.rds
 .Rproj.user
