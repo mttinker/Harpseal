@@ -57,8 +57,8 @@ parameters {
   real<lower=0> thta;             // theta parameter: controls "shape" of DD 
   real<lower=0> phiJ;             // Juvenile survival D-D effects 
   real<lower=0> phiF;             // Fecundity (preg rate) D-D effects
-  real<lower=0> b0 ;              // Fecundity: Logit of max adult pregancy rate
-  real<lower=0> b1;               // Fecundity: age effect (reduced for younger)
+  real<lower=0,upper=5> b0;      // Fecundity: Logit of max adult pregancy rate
+  real<lower=0,upper=0.5> b1;     // Fecundity: age effect (reduced for younger)
   real<lower=0> psi1;             // Ice anomaly effect on pup survival, fxn param 1 
   real<lower=0> psi2;             // Ice anomaly effect on pup survival, fxn param 2 
   real<lower=100000> N0;          // Initial Abundance, year 1

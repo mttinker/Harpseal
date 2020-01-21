@@ -19,15 +19,15 @@ b0 = 2.5        # prior for logit of max adult pregancy rate (2.5 --> Fx=0.92)
 psi1 = 4        # prior for psi param1 of ice anomaly effect fxn (see figure)
 psi2 = .8       # prior for psi param2 of ice anomaly effect fxn 
 #
-# End user params, plot ice mort prior---------------------------------------
+# End user params -----------------------------------------------------------
 #
-# Sample ice anomaly mortality fxn params (explore graphically):
+# Ice anomaly mortality fxn params (can explore graphically):
 psipri1a = psi1   # prior for psi param1 mean: ice anomaly effect fxn
 psipri1b = .5   # prior for psi param1 sd: ice anomaly effect fxn 
 psipri2a = psi2 # prior for psi param2 mean: ice anomaly effect fxn 1.5
 psipri2b = .2 # prior for psi param2 sd: ice anomaly effect fxn   .5
-#source("Ice_mort_plot.r")
-#Ice_mort_plot(psipri1a,psipri1b,psipri2a,psipri2b)
+# source("Ice_mort_plot.r")
+# Ice_mort_plot(psipri1a,psipri1b,psipri2a,psipri2b)
 #
 # Load libraries-------------------------------------------------------------
 require(parallel)
@@ -109,9 +109,10 @@ for (y in 1:Nyrs){
     HVa[y] = df.HV$ADLTOT[ii]
   }
 }
+#
 # Calculate adult and juvenile base log hazards at low densities, 
 #  based on user-provided annual survival rate estimates
-thta = 2.5
+thta = 2.25
 gmvals = seq(2,7,by=0.01)
 SAvals = exp(-1*(exp(gamm0 + gmvals + (.033*.22*1)^thta) + exp(gamm0)))
 SJvals = exp(-1*(exp(gamm0 + gmvals + (.22*1)^thta) + exp(gamm0) + exp(gamm0+.5)))
@@ -138,53 +139,21 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
 #
 init_fun <- function() {list(sigF=runif(1, .8, 1),
                              sigH=runif(1, .8, 1),
-                             phiJ=runif(1, .22, .28),
-                             phiF=runif(1, .26, .3),
+                             phiJ=runif(1, .20, .24),
+                             phiF=runif(1, .24, .28),
                              b0=runif(1, b0pri-.2, b0pri+.2),
-                             b1=runif(1, .18, .2),
-                             psi1=runif(1, psipri1a-1, psipri1a+1),
+                             b1=runif(1, .17, .19),
+                             psi1=runif(1, psipri1a-2, psipri1a),
                              psi2=runif(1, psipri2a-.5, psipri2a+.5),
                              dlta=runif(1, .02, .05),
-                             gammHp_mn=runif(1, 5.5, 6.2),
+                             gammHp_mn=runif(1, 5.5, 6),
                              gammHa_mn=runif(1, 3, 3.5),
                              thta = runif(1, 1, 2)
                              )}
 #
 # For testing inits-----------------------------------------------------
 #
-# source("HSmod_test.r")
-# Year = seq(Year1,YearT-1)
-# Yearp = seq(Year1,YearT)
-# rslt=HSmod_test(init_fun,stan.data)
-# N_Predict = rslt$N_Predict
-# P_Predict = rslt$P_Predict
-# PrPredict = rslt$PrPredict
-# PrAgPred = rslt$PrAgPred
-# Agepredict1 = rslt$Agepredict1 # Age dist for sample year 17 = 1967 (Agecomp row5)
-# Agepredict2 = rslt$Agepredict2 # Age dist for sample year 69 = 2019 (Agecomp row48)
-# HVp_predict = rslt$HVp_predict
-# HVa_predict = rslt$HVa_predict
-# ggplot(data.frame(Year=Yearp,Npred = rowMeans(N_Predict)),aes(x=Year,y=Npred)) +
-#   geom_line()
-# ggplot(data.frame(Year=Year,HvPpred = rowMeans(HVp_predict)),aes(x=Year,y=HvPpred)) +
-#   geom_line() + geom_point(data=df.HV,aes(x=YEAR,y=PUPTOT))
-# ggplot(data.frame(Year=Year,HvApred = rowMeans(HVa_predict)),aes(x=Year,y=HvApred)) +
-#   geom_line() + geom_point(data=df.HV,aes(x=YEAR,y=ADLTOT))
-# ggplot(data.frame(Year=Year,Ppred = rowMeans(P_Predict)),aes(x=Year,y=Ppred)) +
-#   geom_line() + geom_point(data=df.Pup,aes(x=Year,y=Total_Npup))
-# 
-# ggplot(data.frame(Age=ages[3:8], Frequency= rowMeans(Agepredict1)),aes(x=Age,y=Frequency)) +
-#   geom_line() + geom_point(data=data.frame(Age=ages[3:8], Frequency= AgeComp[5,]/sum(AgeComp[5,])),aes(x=Age,y=Frequency))
-# ggplot(data.frame(Age=ages[3:8], Frequency= rowMeans(Agepredict2)),aes(x=Age,y=Frequency)) +
-#   geom_line() + geom_point(data=data.frame(Age=ages[3:8], Frequency= AgeComp[48,]/sum(AgeComp[48,])),aes(x=Age,y=Frequency))
-# ggplot(data.frame(Year=Year,Prt8yrPred = rowMeans(PrPredict)),aes(x=Year,y=Prt8yrPred)) +
-#   geom_line() + geom_point(data=df.Rep[df.Rep$Age==8,],aes(x=Year,y=Prob))
-# ggplot(data.frame(Age=ages, Pregrate= rowMeans(PrAgPred)),aes(x=Age,y=Pregrate)) +
-#   geom_line() + geom_point(data=df.Rep[df.Rep$Year<=1970,],aes(x=Age,y=Prob))
-# 
-# # sad = rslt$SAD
-# rm(rslt,N_Predict,P_Predict,PrPredict,PrAgPred,Agepredict1,
-#    Agepredict2,HVp_predict,HVa_predict)
+# source("Priors_test_script.r")
 #
 # Run JAGS to fit model---------------------------------------------
 params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","dlta",
@@ -194,7 +163,7 @@ params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","dlta",
             "Tstat","Tstat_new","ppp","log_lik") # 
 #
 nsamples <- 500
-nburnin <- 500
+nburnin <- 750
 cores = detectCores()
 ncore = min(20,cores-1)
 #cl <- makeCluster(ncore)
@@ -220,7 +189,7 @@ vn = colnames(mcmc)
 Nsims = nrow(mcmc)
 sumstats = summary(out)$summary
 vns = row.names(sumstats)
-
+#
 traceplot(out, pars=c("sigF","sigH"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("b1"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("b0"), inc_warmup = F, nrow = 2)
@@ -229,6 +198,7 @@ traceplot(out, pars=c("gammHp_mn"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("gammHa_mn"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("dlta"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("psi1","psi2"), inc_warmup = F, nrow = 2)
+traceplot(out, pars=c("thta"), inc_warmup = F, nrow = 2)
 
-save.image(file=paste0("./Results/FitHSmod",fitoption,"_Results_",
+save.image(file=paste0("./Results/FitHSmod_Results_",
                        format(Sys.time(), "%b%d"),".rdata"))

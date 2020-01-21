@@ -1,4 +1,4 @@
-HSmod_test <- function(init_fun,stan.data) {
+HSmod_sim <- function(init_fun,stan.data) {
   # Function to evaluate harp seal model
   futuresim = 0 # (note: if this is a "futer sim", loaded data will update this)
   thta = 2 # (NOTE if thta provided as fixed user input, it will replace this)
@@ -12,6 +12,14 @@ HSmod_test <- function(init_fun,stan.data) {
   }
   gammA = Adloghz
   gammJ = Jvloghz   # Loop through random iterations of model
+  if(futuresim>0){
+    ICr = IC
+    CEr = CE    
+  }
+  if (futuresim==2){
+    ig1 = runif(reps,.5,1.5)
+    ig2 = runif(reps,.8,1.5)
+  }
   iy = c(rep(1,20),seq(2,Nyrs-1))
   iz = numeric(length = length(iy)); iz[1:19] = 1
   # Create some arrays for saving results
@@ -33,6 +41,10 @@ HSmod_test <- function(init_fun,stan.data) {
     eval(parse(text=paste(names(pars)[[i]],"= tempobj")))
   }
   # Initialize variables
+  if(futuresim>0){
+    IC = ICr[sample(1000,Nyrs,replace = T),]
+    CE = CEr[sample(1000,Nyrs,replace = T)]
+  }
   N = numeric(length = Nyrs)
   Nml = numeric(length = Nyrs)
   n = array(dim = c(Nages,Nyrs))
@@ -70,10 +82,10 @@ HSmod_test <- function(init_fun,stan.data) {
     # No harvest (for estimating K)
     gammHp = rep(0,Nyrs-1)
     gammHa = rep(0,Nyrs-1)
-  }else{
-    # Find level of harvest meeting TAC criteria
-    gammHp = rnorm(Nyrs-1,gammHp_mn,sigH)
-    gammHa = rnorm(Nyrs-1,gammHa_mn,sigH)    
+  }else if(futuresim==2){
+    # Range of harvest levels, for finding TAC criteria
+    gammHp = rep(gammHp_mn*ig1[r],Nyrs-1)
+    gammHa = rep(gammHa_mn*ig2[r],Nyrs-1)
   }
   PA = array(dim=c(3,Nyrs-1))
   for(i in 1:(Nyrs-1)){
@@ -120,8 +132,14 @@ HSmod_test <- function(init_fun,stan.data) {
     #  Calculations for proportional mortality from harvest
     prp_HV_p = haz_HVp / (haz_J + haz_I + haz_HVp) 
     HVp_pred[i] = sum((n[,i] * Fc[,i]) * 0.5) * (1 - SJ[i]) * prp_HV_p 
+    if (futuresim==2){
+      HVp_pred[i] = HVp_pred[i] - (Grn_P+Arc_P+Byc_P)
+    }
     prp_HV_a = haz_HVa / (haz_A + haz_HVa) 
     HVa_pred[i] = sum((n[,i] * (1 - S[,i])) * prp_HV_a) 
+    if (futuresim==2){
+      HVa_pred[i] = HVa_pred[i] - (Grn_A+Arc_A+Byc_A)
+    }    
     #  Annual demographic transitions
     nt1[1] = sum(0.5 * n[,i] *  ((Fc[,i] * SJ[i]))) 
     nt1[2:(Nages-1)] = n[1:(Nages-2),i] * S[1:(Nages-2),i]

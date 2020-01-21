@@ -1,6 +1,6 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):
-load(file="./Results/FitHSmod_Results_Jan19b.rdata")
+load(file="./Results/FitHSmod_Results_Jan21.rdata")
 #
 require(parallel)
 require(gtools)
@@ -193,20 +193,22 @@ print(pl7)
 #
 # Evaluate model sims-----------------------------------------------------
 # Simulate future data with or without harvest mort
-futuresim = 1 # 0 = current level of harvest, 1 = no harvest (for estimating K)
-Nyrs2 = 50; Yearst2 = 2020 
+futuresim = 1; # 0 = current level of harvest, 1 = no harvest (for estimating K)
+Nyrs2 = 50; Yearst2 = 2020 ; reps = 500
 PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
 # Future conditions: sample ice and CE indices from after year YY 
 YY = 1969
+Year = seq(Yearst2,Yearst2+Nyrs2-2)
+Yearp = seq(Yearst2,Yearst2+Nyrs2-1)
 ii = which(df.CE$Year>=YY)
-CE2 = log(df.CE$CEindex[sample(ii,Nyrs2)])
+CE2 = log(df.CE$CEindex[sample(ii,1000,replace=T)])
 ii = which(df.Ice$Year>=YY)
-IC2 = as.matrix(cbind(df.Ice$Gulf_Anom[sample(ii,Nyrs2)],
-                      df.Ice$Gulf_Anom[sample(ii,Nyrs2)],
-                      df.Ice$Lab_Anom[sample(ii,Nyrs2)]))
+IC2 = as.matrix(cbind(df.Ice$Gulf_Anom[sample(ii,1000,replace=T)],
+                      df.Ice$Gulf_Anom[sample(ii,1000,replace=T)],
+                      df.Ice$Lab_Anom[sample(ii,1000,replace=T)]))
 #
 N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]
-stan.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=500,
+stan.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,
                   PAmeans=PAmeans,futuresim=futuresim,
                   NFages=NFages,NFage1=NFage1,Nages=Nages,Nareas=Nareas,
                   ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,DDadlt=DDadlt,
@@ -225,23 +227,26 @@ init_fun <- function() {list(sigF=rnorm(1,sumstats[vns=="sigF",1],sumstats[vns==
                              gammHa_mn=rnorm(1,sumstats[vns=="gammHa_mn",1],sumstats[vns=="gammHa_mn",2])
 )}
 #
-source("HSmod_test.r")
+source("HSmod_sim.r")
 Year = seq(Yearst2,Yearst2+Nyrs2-2)
 Yearp = seq(Yearst2,Yearst2+Nyrs2-1)
-rslt=HSmod_test(init_fun,stan.data)
+rslt=HSmod_sim(init_fun,stan.data)
 N_Predict = rslt$N_Predict
-Nfin = colMeans(N_Predict[(Nyrs2-10):Nyrs2,])
+P_Predict = rslt$P_Predict
+P_Predict = rbind(P_Predict,colMeans(P_Predict[(Nyrs2-4):(Nyrs2-1),]))
+Np_Predict = N_Predict + P_Predict
+Nfin = colMeans(Np_Predict[(Nyrs2-10):Nyrs2,])
 Kest = mean(Nfin)
 Kest_sd = sd(Nfin)
 Kest_CI = quantile(Nfin, prob=c(0.025,0.975))
-dpNprd = data.frame(Year = Yearp, N_pred_mean = rowMeans(N_Predict),
-                    N_pred_lo = apply(N_Predict,1,quantile,prob=0.025),
-                    N_pred_hi = apply(N_Predict,1,quantile,prob=0.975))
+dpNprd = data.frame(Year = Yearp, N_pred_mean = rowMeans(Np_Predict),
+                    N_pred_lo = apply(Np_Predict,1,quantile,prob=0.025),
+                    N_pred_hi = apply(Np_Predict,1,quantile,prob=0.975))
 if (futuresim == 0){
   titletxt = "Model projected abundance with current harvest levels"
   subtxt = " "
 }else if (futuresim == 1){
-  titletxt = "Model projected abundance with zero harvest"
+  titletxt = "Model projected abundance with zero harvest (including pups)"
   subtxt =  paste0("Estimated K = ", format(Kest/1000000,digits = 4),
                             "million (", format(Kest_CI[1]/1000000,digits = 4),
                             " - ", format(Kest_CI[2]/1000000,digits = 4),")")
@@ -251,47 +256,5 @@ plNprd = ggplot(data=dpNprd,aes(x=Year,y=N_pred_mean)) +
   geom_line() + labs(x = "Year",y="Projected abundance") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plNprd)
-
-# # Environmental index effect on fecundity----------------------------------
-# NN = c(1,3)
-# CEi = seq(.5,12,length.out = 20); CEi = log(CEi)
-# # inv_logit(b0 - phiF*Nml[i]^thta + dlta*log(CEi)*(Nml[i]))
-# b0_mn = sumstats[which(startsWith(vns,"b0")),1]
-# b0_sd = sumstats[which(startsWith(vns,"b0")),3]
-# b0_r = rnorm(1000,b0_mn,b0_sd)
-# phiF_mn = sumstats[which(startsWith(vns,"phiF")),1]
-# phiF_sd = sumstats[which(startsWith(vns,"phiF")),3]
-# phiF_r = rnorm(1000,phiF_mn,phiF_sd)
-# thta_mn = sumstats[which(startsWith(vns,"thta")),1]
-# thta_sd = sumstats[which(startsWith(vns,"thta")),3]
-# thta_r = rnorm(1000,thta_mn,thta_sd) # replace with vector from fitted estimate
-# dlta_mn = sumstats[which(startsWith(vns,"dlta")),1]
-# dlta_sd = sumstats[which(startsWith(vns,"dlta")),2]
-# dlta_r = rnorm(1000,dlta_mn,dlta_sd)
-# FC = matrix(0,nrow = 2000,ncol=length(CEi))
-# FC_mean = numeric(length = 40)
-# FC_lo = numeric(length = 40)
-# FC_hi = numeric(length = 40)
-# for (i in 1:2){
-#   FC = matrix(0,nrow = 1000,ncol=20)
-#   for(r in 1:1000){
-#     FC[r,] = inv.logit(b0_r[r] - phiF_r[r]*NN[i]^thta_r[r] + 
-#                          dlta_r[r]*CEi*(NN[i]))
-#   }
-#   FC_mean[(20*(i-1)+1):(20*(i-1)+20)] = colMeans(FC)
-#   FC_lo[(20*(i-1)+1):(20*(i-1)+20)] = apply(FC, 2, quantile, prob=0.1)
-#   FC_hi[(20*(i-1)+1):(20*(i-1)+20)] = apply(FC, 2, quantile, prob=0.9)
-# }
-# dp6 = data.frame(Nmil = rep(NN,1,each=20),
-#                  Abundance = rep(c("Low","High"),1,each=20),
-#                  CE_index = rep(CEi,2),
-#                  FC_mean = FC_mean,
-#                  FC_lo = FC_lo, FC_hi = FC_hi)
-# dp6$Abundance = as.factor(dp6$Abundance)
-# pl6 = ggplot(dp6, aes(x=CE_index,y=FC_mean,group=Abundance,color = Abundance, fill=Abundance)) +
-#   geom_ribbon(aes(ymin=FC_lo,ymax=FC_hi),alpha=0.3) +
-#   geom_line() + labs(x = "Environmental Index (CE)",y="Pregnancy rate (8+)") +
-#   ggtitle("Effect of Environment and Density on Adult Fecundity") + theme_classic()
-# print(pl6)
 
 
