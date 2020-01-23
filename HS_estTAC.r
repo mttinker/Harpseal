@@ -1,6 +1,6 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):
-load(file="./Results/FitHSmod_Results_Jan22c.rdata")
+load(file="FitHSmod_Results.rdata")
 #
 require(parallel)
 require(gtools)

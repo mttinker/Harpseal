@@ -202,4 +202,4 @@ traceplot(out, pars=c("psi1","psi2"), inc_warmup = F, nrow = 2)
 traceplot(out, pars=c("thta"), inc_warmup = F, nrow = 2)
 
 save.image(file=paste0("./Results/FitHSmod_Results_",
-                       format(Sys.time(), "%b%d"),".rdata"))
+                       format(Sys.time(),  "%b%d_%H%M"),".rdata"))
