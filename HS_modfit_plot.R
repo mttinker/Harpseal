@@ -2,17 +2,15 @@
 # Load results file (if not already loaded into workspace):
 load(file="Results.rdata")
 #
-require(parallel)
+require(readxl)
+require(stats)
 require(gtools)
+require(fitdistrplus)
+require(dplyr)
 require(lattice)
 require(coda)
 require(ggplot2)
-require(dplyr)
-require(reshape2)
-require(rstan)
-require(stats)
 require(bayesplot)
-require(loo)
 Year = seq(Year1,Year1+Nyrs-2)
 Yearp = seq(Year1,Year1+Nyrs-1)
 # Pop trends ----------------------------------------------------------------

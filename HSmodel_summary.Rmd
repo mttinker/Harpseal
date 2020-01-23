@@ -1,0 +1,44 @@
+---
+title: "Bayesian Harp Seal Model"
+author: "Prepared for Department of Fisheries and Oceans by M. Tim Tinker"
+date: "1/22/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Summary
+
+This report summarizes the results of an analysis of harp seal demographic parameters and population dynamics, based on the most recent available data on pup counts, female pregnancy rates and harvest/bycatch reports. An age-structured population model is fit to these data using Bayesian methods: this model includes density dependent variation in fecundity and survival, environmental stochasticity, and impacts of ice conditions and environmental variables on fecundity and pup survival. Multiple causes of death (baseline mortality, density-dependent effects, ice mortality and harvest mortality) are incorporated as competing risks using a proportional hazards formulation. The model should be re-fit as new data become available (by running the "HS_model_shell.r" script) and the report updated. 
+
+```{r install libraries and load data, include=FALSE, warning=FALSE}
+# This code chunk simply makes sure that all the libraries used here are installed
+existing_Packages<-as.list(installed.packages()[,1])
+# Add new packages you might need to this line, to check if they're installed and install missing packages
+required_Packages<-c("knitr","readxl", "gtools", "stats", "dplyr", "ggplot2", "fitdistrplus", "lattice","coda","bayesplot")
+missing_Packages<- required_Packages[!required_Packages%in% existing_Packages]
+if(length(missing_Packages)>0)install.packages(pkgs =  missing_Packages)
+invisible(lapply(required_Packages, require, character.only=T,quietly = T))
+rm(existing_Packages, missing_Packages, required_Packages)
+#
+load(file="Results.rdata")
+```
+
+## Methods
+
+```{r cars, echo=FALSE}
+kable(summary(cars))
+```
+
+## Results
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
