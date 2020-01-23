@@ -1,6 +1,6 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):
-load(file="./Results/FitHSmod_Results_Jan21.rdata")
+load(file="./Results/FitHSmod_Results_Jan22c.rdata")
 #
 require(parallel)
 require(gtools)
@@ -198,8 +198,6 @@ Nyrs2 = 50; Yearst2 = 2020 ; reps = 500
 PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
 # Future conditions: sample ice and CE indices from after year YY 
 YY = 1969
-Year = seq(Yearst2,Yearst2+Nyrs2-2)
-Yearp = seq(Yearst2,Yearst2+Nyrs2-1)
 ii = which(df.CE$Year>=YY)
 CE2 = log(df.CE$CEindex[sample(ii,1000,replace=T)])
 ii = which(df.Ice$Year>=YY)
@@ -228,8 +226,7 @@ init_fun <- function() {list(sigF=rnorm(1,sumstats[vns=="sigF",1],sumstats[vns==
 )}
 #
 source("HSmod_sim.r")
-Year = seq(Yearst2,Yearst2+Nyrs2-2)
-Yearp = seq(Yearst2,Yearst2+Nyrs2-1)
+Yearp2 = seq(Yearst2,Yearst2+Nyrs2-1)
 rslt=HSmod_sim(init_fun,stan.data)
 N_Predict = rslt$N_Predict
 P_Predict = rslt$P_Predict
@@ -239,7 +236,7 @@ Nfin = colMeans(Np_Predict[(Nyrs2-10):Nyrs2,])
 Kest = mean(Nfin)
 Kest_sd = sd(Nfin)
 Kest_CI = quantile(Nfin, prob=c(0.025,0.975))
-dpNprd = data.frame(Year = Yearp, N_pred_mean = rowMeans(Np_Predict),
+dpNprd = data.frame(Year = Yearp2, N_pred_mean = rowMeans(Np_Predict),
                     N_pred_lo = apply(Np_Predict,1,quantile,prob=0.025),
                     N_pred_hi = apply(Np_Predict,1,quantile,prob=0.975))
 if (futuresim == 0){
@@ -256,5 +253,4 @@ plNprd = ggplot(data=dpNprd,aes(x=Year,y=N_pred_mean)) +
   geom_line() + labs(x = "Year",y="Projected abundance") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plNprd)
-
 

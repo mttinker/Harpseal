@@ -95,6 +95,7 @@ HSmod_sim <- function(init_fun,stan.data) {
   Nml[1] = N[1]/1000000 
   # Loop through years to calculate demographic transitions and population dynamics 
   for (ix in 1:length(iy)){
+    npsv = 1-(inv.logit(rnorm(1,0,1))/10) 
     i = iy[ix]
     if (i == 1){
       n[,i] = sad0 * N[i]
@@ -131,7 +132,7 @@ HSmod_sim <- function(init_fun,stan.data) {
     S[,i] = exp(-1 * (haz_A + haz_HVa))     
     #  Calculations for proportional mortality from harvest
     prp_HV_p = haz_HVp / (haz_J + haz_I + haz_HVp) 
-    HVp_pred[i] = sum((n[,i] * Fc[,i]) * 0.5) * (1 - SJ[i]) * prp_HV_p 
+    HVp_pred[i] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (1 - SJ[i]) * prp_HV_p 
     if (futuresim==2){
       HVp_pred[i] = HVp_pred[i] - (Grn_P+Arc_P+Byc_P)
     }
@@ -141,7 +142,7 @@ HSmod_sim <- function(init_fun,stan.data) {
       HVa_pred[i] = HVa_pred[i] - (Grn_A+Arc_A+Byc_A)
     }    
     #  Annual demographic transitions
-    nt1[1] = sum(0.5 * n[,i] *  ((Fc[,i] * SJ[i]))) 
+    nt1[1] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (SJ[i])
     nt1[2:(Nages-1)] = n[1:(Nages-2),i] * S[1:(Nages-2),i]
     nt1[Nages] = n[Nages-1,i] * S[Nages-1,i] + n[Nages,i] * S[Nages,i] ;    
     if (iz[ix] == 1){
@@ -155,7 +156,7 @@ HSmod_sim <- function(init_fun,stan.data) {
       #  Predicted Pups to be surveyed (allowing for early ice mortality), 
       #    by area and total, for year i 
       for (a in 1:Nareas){
-        PredPupA[a,i] = sum((n[,i] * Fc[,i]) * 0.5 * PA[a,i] * sqrt(Sice[a,i])) ;
+        PredPupA[a,i] = sum((n[,i] * Fc[,i]) * 0.5 * npsv * PA[a,i] ) ;
       }
       PredPup[i] = sum(PredPupA[,i])
     }

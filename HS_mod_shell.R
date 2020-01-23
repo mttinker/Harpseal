@@ -12,8 +12,8 @@ N0pri = 1500000 # prior guess of starting pop size, default ~ 2 million
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
 # Priors for demographic params
-Adl_Sx = 0.94    # Adult base survival (no harvest), low density (N~ 1 million)
-Juv_Sx = 0.82    # Juvenile base survival (no harvest), low density (N~ 1 million)
+Adl_Sx = 0.95    # Adult base survival (no harvest), low density (N~ 1 million)
+Juv_Sx = 0.85    # Juvenile base survival (no harvest), low density (N~ 1 million)
 b0 = 2.5        # prior for logit of max adult pregancy rate (2.5 --> Fx=0.92)
 # Ice anomaly effects on pup survival:
 psi1 = 4        # prior for psi param1 of ice anomaly effect fxn (see figure)
@@ -112,10 +112,10 @@ for (y in 1:Nyrs){
 #
 # Calculate adult and juvenile base log hazards at low densities, 
 #  based on user-provided annual survival rate estimates
-thta = 2.25
+thta = 2.3
 gmvals = seq(2,7,by=0.01)
 SAvals = exp(-1*(exp(gamm0 + gmvals + (.033*.22*1)^thta) + exp(gamm0)))
-SJvals = exp(-1*(exp(gamm0 + gmvals + (.22*1)^thta) + exp(gamm0) + exp(gamm0+.5)))
+SJvals = exp(-1*(exp(gamm0 + gmvals + (.22*1)^thta) + exp(gamm0) + exp(gamm0+1)))
 Adloghz = gmvals[which(abs(SAvals-Adl_Sx)==min(abs(SAvals-Adl_Sx)))]
 Jvloghz = gmvals[which(abs(SJvals-Juv_Sx)==min(abs(SJvals-Juv_Sx)))]
 # scaled DD effects (relative to juv) for 1st 8 adult age classes:
@@ -146,9 +146,9 @@ init_fun <- function() {list(sigF=runif(1, .8, 1),
                              psi1=runif(1, psipri1a-2, psipri1a),
                              psi2=runif(1, psipri2a-.5, psipri2a+.5),
                              dlta=runif(1, .02, .05),
-                             gammHp_mn=runif(1, 5.5, 6),
+                             gammHp_mn=runif(1, 5.7, 6),
                              gammHa_mn=runif(1, 3, 3.5),
-                             thta = runif(1, 1, 2)
+                             thta = runif(1, 1.5, 2.4)
                              )}
 #
 # For testing inits-----------------------------------------------------
@@ -156,30 +156,31 @@ init_fun <- function() {list(sigF=runif(1, .8, 1),
 # source("Priors_test_script.r")
 #
 # Run JAGS to fit model---------------------------------------------
-params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","dlta",
-            "psi1","psi2","gammHp_mn","gammHa_mn","thta",
-            "N","PredPup","gammHp","gammHa","HVp_pred","HVa_pred",
-            "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","epsF",
-            "Tstat","Tstat_new","ppp","log_lik") # 
+params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","thta",
+            "dlta","psi1","psi2","gammHp_mn","gammHa_mn","N",
+            "PredPup","gammHp","gammHa","HVp_pred","HVa_pred",
+            "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","epsF","nphz",
+            "log_lik","Tstat1","Tstat_new1","ppp1",
+            "Tstat2","Tstat_new2","ppp2",
+            "Tstat","Tstat_new","ppp") # 
 #
 nsamples <- 500
-nburnin <- 750
+nburnin <- 500
 cores = detectCores()
 ncore = min(20,cores-1)
-#cl <- makeCluster(ncore)
-nc <- ncore
 
 out <- stan(
-  file = fitmodel,     # Stan program
-  data = stan.data,    # named list of data
-  pars = params,       # list of params to monitor
-  init= init_fun,       # initial values    "random"            
-  chains = nc,         # number of Markov chains
+  file = fitmodel,         # Stan program
+  data = stan.data,        # named list of data
+  pars = params,           # list of params to monitor
+  init= init_fun,          # initial values    "random"            
+  chains = ncore,          # number of Markov chains
   warmup = nburnin,        # number of warmup iterations per chain
   iter = nburnin+nsamples, # total number of iterations per chain
-  cores = nc,          # number of cores 
-  refresh = 100,         # show progress every 'refresh' iterations
-  control = list(adapt_delta = 0.99, max_treedepth = 15) # increase to help find optimal vals
+  cores = ncore,           # number of available cores 
+  refresh = 100,           # show progress every 'refresh' iterations
+  # increase adapt_delta and max_treedepth to help find optimal vals
+  control = list(adapt_delta = 0.959, max_treedepth = 12) 
 )
 #
 # Calclate Sumstats -------------------------------------------------
