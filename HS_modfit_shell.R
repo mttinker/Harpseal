@@ -125,7 +125,7 @@ rm(i,ii,y,aa,ft)
 #
 # Set up Jags inputs --------------------------------------------------------
 #
-fitmodel = c("HSmodfit.stan")
+fitmodel = c("HSmodfitVP.stan")
 #  
 stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
                   NFobs=NFobs,NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
@@ -134,8 +134,8 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
                   Nprg=Nprg,YrPct=YrPct,PAtag=PAtag,YrAGsmp=YrAGsmp,
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,DDadlt=DDadlt,psipri1a=psipri1a,
                   psipri1b=psipri1b,psipri2a=psipri2a,psipri2b=psipri2b,
-                  b0pri=b0pri,psi1=psi1,psi2=psi2,Adloghz=Adloghz,Jvloghz=Jvloghz,
-                  CV_HV=CV_HV,gamm0=gamm0,PApri=PApri,N0pri=N0pri) # ,thta=thta
+                  psi1=psi1,psi2=psi2,Adloghz=Adloghz,Jvloghz=Jvloghz,
+                  CV_HV=CV_HV,gamm0=gamm0,PApri=PApri,N0pri=N0pri) 
 #
 init_fun <- function() {list(sigF=runif(1, .8, 1),
                              sigH=runif(1, .8, 1),

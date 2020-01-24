@@ -2,43 +2,542 @@
 title: "Bayesian Harp Seal Model"
 author: "Prepared for Department of Fisheries and Oceans by M. Tim Tinker"
 date: "1/22/2020"
-output: html_document
-editor_options: 
+output:
+  html_document: 
+    fig_width: 9
+  pdf_document: 
+    fig_width: 7
+    toc: yes
+  word_document: 
+    fig_width: 7
+    toc: yes
+editor_options:
   chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(tinytex.verbose = TRUE)
 ```
 ## Summary
 
-This report summarizes the results of an analysis of harp seal demographic parameters and population dynamics, based on the most recent available data on pup counts, female pregnancy rates and harvest/bycatch reports. An age-structured population model is fit to these data using Bayesian methods: this model includes density dependent variation in fecundity and survival, environmental stochasticity, and impacts of ice conditions and environmental variables on fecundity and pup survival. Multiple causes of death (baseline mortality, density-dependent effects, ice mortality and harvest mortality) are incorporated as competing risks using a proportional hazards formulation. The model should be re-fit as new data become available (by running the "HS_model_shell.r" script) and the report updated. 
+This report summarizes the results of an analysis of harp seal demographic parameters and population dynamics, based on the most recent available data on pup counts, female pregnancy rates, harvest/bycatch reports, annual ice cover and environmental conditions. An age-structured population model is fit to these data using Bayesian methods: the model includes density dependent variation in fecundity and survival, environmental stochasticity, and effects of ice conditions and environmental variables on fecundity and pup survival. Multiple causes of death (baseline mortality with density-dependent effects, pup mortality due to poor ice cover, and harvest/bycatch mortality) are incorporated as competing risks using a proportional hazards formulation. The model should be re-fit as new data become available, and the report updated.
 
 ```{r install libraries and load data, include=FALSE, warning=FALSE}
-# This code chunk simply makes sure that all the libraries used here are installed
+# This code chunk simply makes sure that all the libraries used here are 
+# installed on local system, the loads them
 existing_Packages<-as.list(installed.packages()[,1])
 # Add new packages you might need to this line, to check if they're installed and install missing packages
-required_Packages<-c("knitr","readxl", "gtools", "stats", "dplyr", "ggplot2", "fitdistrplus", "lattice","coda","bayesplot")
+required_Packages<-c("knitr","readxl", "gtools", "stats", "dplyr", "ggplot2", "fitdistrplus", "lattice","coda","bayesplot","foreach","doParallel")
 missing_Packages<- required_Packages[!required_Packages%in% existing_Packages]
 if(length(missing_Packages)>0)install.packages(pkgs =  missing_Packages)
 invisible(lapply(required_Packages, require, character.only=T,quietly = T))
 rm(existing_Packages, missing_Packages, required_Packages)
 #
+# Load results file
 load(file="Results.rdata")
+Year = seq(Year1,Year1+Nyrs-2)
+Yearp = seq(Year1,Year1+Nyrs-1)
 ```
 
 ## Methods
+The methods for analyzing the harp seal population can be described in three parts: 1) the process model, a series of equations that describe demographic transitions and which, when solved, produce dynamics in the variables of interest (e.g. population abundance) based on the values of the input parameters; 2) the data model, which describes how empirical data sets are related to the predicted dynamics of the process model; 3) model fitting, which describes how input parameters are estimated.  
 
-```{r cars, echo=FALSE}
-kable(summary(cars))
-```
+### Process model
+Population dynamics are described using discrete annual time steps and formulated assuming a pre-breeding survey (i.e. the population state at time *t* corresponds to the state at the beginning of a pupping season). The population is age-structured, such that a population vector *n*(*a,t*) describes the number of individuals in age class *a* (*a* = 1,2... *A*) at year *t*, and *N*(*t*) is the sum of *n*(*a,t*) across age classes. Note that, given a pre-breeding survey, the first entry in the population vector (*n*(1)) represents juveniles just recruiting to adult population, i.e. pups born the previous year that survived to their first birthday, and the last entry (*n*(*A*)) represents adults 8 years of age or older. Demographic transitions from year *t* to year *t+1* are calculated from annually varying vital rates, including fecundity ($F$), juvenile survival ($S_{J}$, the probability a pup survives to its first birthday), and adult survival ($S_{A}$, the probability an animal $\ge$ 1-year-old survives to the next year). Vital rates are assumed to be density-dependent, meaning that they can vary as functions of relative population abundance (*N’*, which for computational simplicity we re-scale to units of millions of animals), and are also affected by environmental conditions, ice cover and harvest/bycatch mortality. Specifically, annual vital rates are computed as functions of these variables and various model input parameters (see Table 1) as follows:   
+
+#### Fecundity
+The factors that determine the probability a female gives birth (or at least reaches late-stage pregnancy) at year *t* are her age (*a*), current population density (*N’*(*t*)), environmental condition index (*CE*), and unexplained variance (environmental stochasticity):
+$$logit\left( {F(a,t)} \right) = {\beta _0} + {\beta _1} \cdot {\left( {A - a} \right)^2} - {\left( {{\phi _F} \cdot {N'}(t)} \right)^\theta } + \delta  \cdot CE(t) \cdot {N'}(t) + {\varepsilon _F}(t)$$
+where $${\varepsilon _F}(t)\sim normal\left( {0,{\sigma _F}} \right)$$ and where $\beta$, $\phi_F$, $\delta$, and $\sigma_F$ are all parameters to be fit.  Environmental index (*CE*) values were log-transformed, which both normalized and resulted in a mean value (for 1951-2019) of approximately 0.
+
+#### Newborn pup survival
+While fecundity accounts for the proportion of females potentially producing a pup, not all late-term pregnancies result in viable pups that survive long enough to be surveyed. A small and variable proportion of females abort their pups, while other pups may be stillborn, and others may perish early (i.e. before a pup count survey is conducted). Based on previously assessed abortion rates, it is estimated that the percent of pregnancies leading to viable pups (“newborn pup survival”, $S_{P}$) averages around 95% but may vary from 90-100%. To allow for stochasticity in newborn survival (and thus permit some decoupling of pregnancy rates and subsequent pup counts), we specify parameter *z*(*t*) drawn from a random normal distribution:
+$$z(t)\sim normal\left( {0,1} \right)$$
+and use this value to calculate annual newborn pup survival as:
+$${S_P}(t) = 1 - \left( {\frac{{logi{t^{ - 1}}\left[ {z(t)} \right]}}{{10}}} \right)$$
+The resulting distribution of $S_{P}(t)$ has a mean of 0.95 and is bounded by 0.90 and 1.
+
+#### Juvenile survival
+The factors that determine the probability of a pup surviving to recruitment as a 1-year-old include baseline juvenile hazards (i.e. mortality risks faced by juveniles even under the best conditions), density-dependent hazards, the hazards associated with anomalously low ice cover, and harvest/bycatch mortality. Survival is modeled using a proportional hazards approach with multiple competing risks (e.g. see Gelfand et al. 2000, Heisey and Patterson 2006, Beyersmann et al. 2009, Brodie et al. 2013), as this provides a convenient and mathematically coherent way to partition mortality among several risk factors. Specifically, survival from multiple hazards is calculated as:
+$${S_J}(t) = \exp \left( { - 1 \cdot \left[ {{h_J}(t) + {h_{HVJ}}(t) + {h_I}(t)} \right]} \right)$$
+where the cause-specific, instantaneous hazards from typical density-dependent factors (${h_J}(t)$), ice anomalies (${h_I}(t)$) and harvest/bycatch mortality (${h_{HVJ}}(t)$) are calculated as:
+$${h_J}(t) = \exp \left( {{\gamma _0} + {\gamma _J} + {{\left( {{\phi _J} \cdot {N’}(t)} \right)}^\theta }} \right)$$
+$${h_I}(t) = \sum\limits_{b = 1}^3 {PD(b,t) \cdot } \exp \left( {{\gamma _0} + {\gamma _I}(b,t)} \right)$$ 
+$${h_{HVJ}}(t) = \exp \left( {{\gamma _0} + {\gamma _{HVJ}}(t)} \right)$$
+and annual juvenile harvest log hazards are treated as a hierarchical stochastic parameter:
+$${\gamma _{HVJ}}(t)\sim normal\left( {{{\bar \gamma }_{HVJ}},{\sigma _{HV}}} \right)$$
+Note that annual ice anomaly hazards vary across breeding areas (*b* = 1 for S. Gulf, 2 for N. Gulf, 3 for Front), and thus ice hazard values are weighted by the proportional distribution of pups in each area (*PD*(*b,t*)). The area-specific hazards associated with ice cover are assumed to be negligible in years of high or “normal” ice cover but increase rapidly as ice cover drops to anomalously low values.  Accordingly, the ice-associated log hazard rate ($\gamma _I$) is modeled as a non-linear function of ice cover:
+$${\gamma _I}(b,t) = {\psi _1} \cdot {\left( {\frac{1}{{\exp \left( {IC(b,t)} \right)}}} \right)^{{\psi _2}}} - 1$$
+where *IC*(*b,t*) is the ice cover anomaly index value in area *b* in year *t*, calculated as annual deviations from the average % cover values for 1969-2000, rescaled to vary from -1 to 1. In the above equations, ${\gamma _0}$ is a nuisance parameter fixed at -7, ${\gamma _J}$ is set to give a maximum juvenile survival rate (at low population density and without harvest) of 0.85, and ${\phi _J}$, $\theta$, $\psi$, ${{\bar \gamma }_{HVJ}}$ and ${\sigma _{HV}}$ are all parameters to be fit.
+
+#### Adult survival
+The factors that determine the probability of an adult surviving from one year to the next include baseline adult hazards (i.e. mortality risks faced by adults even under the best conditions), density-dependent hazards, and harvest/bycatch mortality. Survival from these competing hazards is calculated as:
+$${S_A}(t) = \exp \left( { - 1 \cdot \left[ {{h_A}(t) + {h_{HVA}}(t)} \right]} \right)$$
+where the cause-specific, instantaneous hazards from typical density-dependent factors (${h_A}(t)$) and harvest/bycatch mortality (${h_{HVA}}(t)$) are calculated as:
+$${h_A}(t) = \exp \left( {{\gamma _0} + {\gamma _A}} \right)$$
+$${h_{HVA}}(t) = \exp \left( {{\gamma _0} + {\gamma _{HVA}}(t)} \right)$$
+and annual adult harvest log hazards are treated as a hierarchical stochastic parameter:
+$${\gamma _{HVA}}(t)\sim normal\left( {{{\bar \gamma }_{HVA}},{\sigma _{HV}}} \right)$$
+In the above equations, ${\gamma _0}$ is a nuisance parameter fixed at -7, ${\gamma _A}$ is set to give a baseline adult survival rate (at low population density and without harvest) of 0.95, and ${{\bar \gamma }_{HVJ}}$ and ${\sigma _{HV}}$ are parameters to be fit.
+
+#### Population dynamics
+The population vector was initiated by multiplying the estimated starting abundance (*N*_0, a parameter to be fit) by the stable age distribution (*SAD*) associated with the best-fit vital rates at *t* = 1. The *SAD* vector was derived by iteratively solving the model, re-calculating the *SAD*, substituting it back in and re-solving the model.
+
+The number of juveniles recruiting to the first age class in year *t*+1 is calculated as:
+$$n(1,t + 1) = 0.5 \cdot \left( {\sum\limits_{a = 1}^A {n(a,t) \cdot F(a,t)} } \right) \cdot {S_P}(t) \cdot {S_J}(t)$$
+The numbers of adults in age classes 2 to *A*-1 in year *t*+1 are calculated as:
+$$n(a,t + 1) = n(a - 1,t) \cdot {S_A}(t)\;for\;2 \le a < A$$
+while the number of adults in age class *A* in year *t*+1 is calculated as:
+$$n(A,t + 1) = n(A - 1,t) \cdot {S_A}(t) + n(A,t) \cdot {S_A}(t)$$
+The predicted adult age distribution (for ages 3-8+) in year *t* is calculated as:
+$$Agedist\_pred(t) = \frac{{\left[ {\begin{array}{*{20}{c}}
+{n(3,t)}&{n(4,t)}&{...}&{n(A,t)}
+\end{array}} \right]}}{{\sum\limits_{a = 3}^A {n(a,t)} }}$$
+
+
+#### Predicted pup counts
+The predicted number of pups available to be counted during a survey in year *t* is calculated as:
+$$Pups\_pred(t) = 0.5 \cdot \left( {\sum\limits_{a = 1}^A {n(a,t) \cdot F(a,t)} } \right) \cdot {S_P}(t)$$
+
+
+#### Predicted harvest/bycatch mortality
+The fraction of total first-year deaths represented by harvest/bycatch of beaters in year *t* is calculated as:
+$${f_{HVJ}}(t) = \frac{{{h_{HVJ}}(t)}}{{\left[ {{h_J}(t) + {h_{HVJ}}(t) + {h_I}(t)} \right]}}$$
+allowing the total predicted harvest/bycatch of beaters in year *t* to be calculated as:
+$$pred\_H{V_J}(t) = 0.5 \cdot \left( {\sum\limits_{a = 1}^A {n(a,t) \cdot F(a,t)} } \right) \cdot {S_P}(t) \cdot \left( {1 - {S_J}(t)} \right) \cdot {f_{HVJ}}(t)$$
+The fraction of total adult deaths represented by harvest/bycatch of adults in year *t* is calculated as:
+$${f_{HVA}}(t) = \frac{{{h_{HVA}}(t)}}{{\left[ {{h_A}(t) + {h_{HVA}}(t)} \right]}}$$
+allowing the total predicted harvest/bycatch of adults in year *t* to be calculated as:
+$$pred\_H{V_A}(t) = \sum\limits_{a = 1}^A {n(a,t) \cdot \left( {1 - {S_A}(t)} \right)}  \cdot {f_{HVA}}(t)$$
+ 
+##### **Table 1. Summary of estimated parameters**
+Parameter | Description
+----------|------------
+$N_0$     | Starting population abundance at *t* = 1
+$\beta_0$ | Maximum pregnancy rate for adult females
+$\beta_1$ | Age-effect on fecundity (pregnancy rate increases with age)
+$\phi_F$  | Density-dependent effects on fecundity
+$\delta$  | Effect of environmental conditions on fecundity
+$\sigma_F$| Unexplained variation in annual fecundity
+$\phi_J$  | Density-dependent effects on juvenile survival
+$\theta$  | Shape-parameter for density-dependent effects
+$\psi_1$  | Parameter 1 for function describing ice  effects on juvnile mortality
+$\psi_2$  | Parameter 2 for function describing ice  effects on juvnile mortality
+${{\bar \gamma }_{HVJ}}$ | Mean log hazard rate for juvenile harvest/bycatch
+${{\bar \gamma }_{HVA}}$ | Mean log hazard rate for adult harvest/bycatch
+${\sigma _{HV}}$ | Variation in log hazard rates for harvest
+
+
+### Data model
+The variables generated by the process model are compared to 4 separate data sets: aerial pup surveys, pregnancy rates of sample females, age composition of sample adult females, and the combined harvest/bycatch estimates from multiple sources.The pup abundance estimates are assumed to follow a normal distribution:
+$$Pups(t)\sim normal\left( {Pups\_pred(t),S{E_p}(t)} \right)$$
+The data on pregnancy rates of sampled females are treated as a binomial variable.  Specifically, given a sample of *N* females of age *a* in year *t* (*NF*(*a,t*)), the number of pregnant females (*NP*(*a,t*)) is assumed to follow a binomial distribution with probability determined by the model predicted fecundity rates:
+$$NP(a,t)\sim binomial\left( {NF(a,t),F(a,t)} \right)$$
+The female age composition data are treated as a multinomial variable. Specifically, samples of adult females in year *t* are assorted by age into vectors of counts, *Agecounts*(*t*) = [*NF*(3,*t*),*NF*(4,*t*)… *NF*(*A,t*)], and these age count vectors are assumed to follow a multinomial distribution with probabilities determined by the model predicted age distributions: 
+$$Agecounts(t)\sim multinomial\left( {\sum\limits_{a = 3}^A {NF(a,t)} ,Agedist\_pred(t)} \right)$$
+The summed annual harvest/bycatch estimates are assumed to follow normal distributions:
+$$H{V_P}(t)\sim normal\left( {pred\_H{V_P}(t),S{E_{HV}}} \right)$$
+$$H{V_A}(t)\sim normal\left( {pred\_H{V_A}(t),S{E_{HV}}} \right)$$
+where the standard error values for observed harvest data are set so as to correspond to an assumed CV of 0.1. 
+
+### Model fitting
+The observed data variables constrain the possible values of unknown parameters in the process model, allowing us to estimate posterior distributions for these parameters using standard Markov Chain Monte Carlo (MCMC) methods. We use vague prior distributions for most parameters (i.e., weakly informed based on biological feasibility but having no information specific to the analysis), including Cauchy priors for fixed-effect parameters, Gamma priors for $N_0$ and $\theta$, and half-Cauchy priors for variance parameters that were constrained to be positive (Gelman 2006, Gelman et al. 2008). For the ice-anomaly effect parameters ($\psi_1$ and $\psi_2$) we used informed normal priors with means of 4 and 0.8 (respectively) and standard deviations 0.5, as these values produced a range of functional relationships between ice anomalies and pup mortality that agreed well with existing information on ice-based pup mortality. We used R (R.Core.Team 2014) and Stan software (Carpenter et al. 2017) to code and fit the model, saving 20,000 samples after a burn-in of 1000 samples. We evaluated model convergence by graphical examination of trace plots from 20 independent chains and by ensuring that Gelman-Rubin convergence diagnostic (R-hat) was <1.1 for all fitted model parameters. We conducted graphical posterior predictive checking to evaluate model goodness of fit. Model results are summarized by reporting the mean and 95% Credible Interval (CI) of the posterior distributions for model parameters and derived parameters. 
+
+### Model simulations
+We used the fitted parameters to generate posterior predictive distributions of future population dynamics under various scenarios, by running Monte Carlo simulations of the model. To estimate functional carrying capacity (*K*), we initiated each of 20,000 simulations with the final estimated population vector (based on model fitting to current data) and ran them forward for 50 years, with harvest hazards ($\gamma _{HVJ}$ and $\gamma _{HVA}$) forced to 0 but all other parameters drawn randomly from their respective posterior distributions. The resulting distribution of simulated trajectories therefore included the effects of ice mortality, environmental conditions, stochasticity and density-dependent effects, but not harvest mortality. The average abundance of these forward simulations generally stabilized after 25 years, so we used the mean values (and 95% CI) of the abundance over the last 20 years to estimate equilibrium abundance in the absence of harvest.  A key consideration for these future simulations is how environmental conditions and ice cover may change in the future. To account for the generally declining nature of these indices, we used the distribution of *IC* and *CE* values for years after 1999 to parameterize future simulations (though other projections of future conditions could also be used). 
+
+We used a similar approach - Monte Carlo simulations of future dynamics - to estimate recommended values for Total Allowable Catch (TAC). The TAC guidelines for harp seals require determining the maximum value of harvest mortality (for Canadian harvests only, excluding bycatch mortality and Arctic and Greenland hunting mortality) that will still ensure an 80% probability that population abundance remains above a critical threshold value for the next 15 years, assuming all demographic processes (including other sources of mortality) are consistent with past dynamics. We evaluated two threshold values, N50 and N70, which represent (respectively) 50% and 70% of the maximum estimated historical abundance (which we base on the above-described analyses). We also evaluated 3 different harvest scenarios, corresponding to harvest age compositions of 5% adults, 10% adults and 50% adults. For each scenario, we ran 20,000 simulations for 15 years, with harvest hazard rates selected randomly from within a broad distribution and all other parameters drawn from their posterior predictive distriubtions. We then used the resulting distribution of results to determine the largest average rate of harvest mortality at which 80% of simulated trajectories remained above the specified threshold value, and used these to set recommended TAC values.
+
 
 ## Results
 
-You can also embed plots, for example:
+Fitting the model to existing data provided excellent convergence, with R-hat<1.01 for all parameters (Table 2).
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r Table2, echo=FALSE}
+ix = c(7,5,6,4,9,1,3,8,10,11,12,13,2)
+statsum = sumstats[ix,c(1,3,4,8,10)]
+row.names(statsum) = c("N0(millions)","Beta_0","Beta_1","Phi_F",
+                       "Delta","Sigma_F","Phi_J","Theta","Psi_1",
+                       "Psi_2","Gamma_mn_HVJ","Gamma_mn_HVA","Sigma_HV")
+statsum[1,1:4] = (statsum[1,1:4])/1000000
+kable(statsum,digits=3,caption="Table 2: Statistics for fitted parameters")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+The best-fit function for Fecundity includes a significant age effect, such that pregnancy rates decreases for ages less than 8, with the rate of decreaase accelerating for the youngest age classes (Fig. 1). Density-dependent effects also cause a non-linear, accelerating reduction in pregnancy rates as abundance increases (Fig. 2).  
+
+```{r Fig1, echo=FALSE, warning=FALSE}
+PR1966 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][16]
+PR1966per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][1:32],na.rm = T)
+crct1 = PR1966per/PR1966
+PR2016 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][66]
+PR2016per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][50:69],na.rm = T)
+crct2 = PR2016per/PR2016
+
+dpF1 = data.frame(Age=ages, Year = (rep(1966,Nages)),Period=rep("1951-1985",Nages),
+                 PRexp=sumstats[startsWith(vns,"Fc1966_prdct[")==T,1]*crct1,
+                 PR_lo = sumstats[startsWith(vns,"Fc1966_prdct[")==T,4]*crct1,
+                 PR_hi = sumstats[startsWith(vns,"Fc1966_prdct[")==T,8]*crct1)
+dpF1 = rbind(dpF1, data.frame(Age=ages, Year = (rep(2016,Nages)),
+                 Period=rep(paste0("1990-",YearT-1),Nages),           
+                 PRexp=sumstats[startsWith(vns,"Fc2016_prdct[")==T,1]*crct2,
+                 PR_lo = sumstats[startsWith(vns,"Fc2016_prdct[")==T,4]*crct2,
+                 PR_hi = sumstats[startsWith(vns,"Fc2016_prdct[")==T,8]*crct2))
+dpF1$Obs = numeric(length = nrow(dpF1))
+dpF1$ObsSE = numeric(length = nrow(dpF1))
+for (i in 1:nrow(dpF1)){
+  ii = which(df.Rep$Age==dpF1$Age[i] & df.Rep$Year>(dpF1$Year[i]-20) & 
+               df.Rep$Year<(dpF1$Year[i]+20))
+  dpF1$Obs[i] = mean(df.Rep$Prob[ii])
+  dpF1$ObsSE[i] = sd(df.Rep$Prob[ii])/sqrt(length(df.Rep$Prob[ii]))
+}
+dpF1$Year = as.factor(dpF1$Year); dpF1$Period = as.factor(dpF1$Period)
+plF1 = ggplot(data=dpF1,aes(x=Age,y=PRexp,group=Period,color = Period, fill=Period)) +
+  geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) + ylim(0,1) +
+  geom_line() + labs(x = "Age",y="Pregnancy rate") +
+  geom_point(aes(y=Obs),size=2) +
+  geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
+                      ymax = Obs+1.96*ObsSE),width=.2) +
+  ggtitle("Figure 1. Model estimated vs observed pregancy rates by age",
+          subtitle = "Low density vs. high density population") + 
+  # scale_color_discrete(palette="Harmonic") +
+  scale_color_brewer(palette="Dark2") +
+  scale_fill_brewer(palette="Dark2") +
+  theme_classic() 
+print(plF1)
+```
+
+```{r Fig2, echo=FALSE, warning=FALSE}
+NN = seq(.2,5,by=0.1)
+iir = sample(Nsims,1000)
+b0_r = mcmc[iir,vn=="b0"]
+phiF_r = mcmc[iir,vn=="phiF"]
+thta_r = mcmc[iir,vn=="thta"]
+FC = matrix(0,nrow = 1000,ncol=length(NN))
+FC_mean = numeric(length = 40)
+FC_lo = numeric(length = 40)
+FC_hi = numeric(length = 40)
+for(r in 1:1000){
+  FC[r,] = inv.logit(b0_r[r] - phiF_r[r]*NN^thta_r[r])
+}
+FC_mean = colMeans(FC)
+FC_lo = apply(FC, 2, quantile, prob=0.055)
+FC_hi = apply(FC, 2, quantile, prob=0.95)
+dpF2 = data.frame(Nmil = NN, Fecundity = FC_mean,
+                 FC_lo = FC_lo, FC_hi = FC_hi)
+plF2 = ggplot(dpF2, aes(x=Nmil,y=Fecundity)) +
+  geom_ribbon(aes(ymin=FC_lo,ymax=FC_hi),alpha=0.3) +
+  geom_line() + labs(x = "Abundance (millions), w/o pups",y="Pregnancy rate (8+)") +
+  ggtitle("Figure 2. Density-dependent variation in adult fecundity") + theme_classic()
+print(plF2)
+```
+
+Juvenile survival rates show a similar density-dependent reduction, with a fairly rapid decline as abundance increases above 4 million animals (exluding pups; Fig. 3)
+
+```{r Fig3, echo=FALSE, warning=FALSE}
+NN = seq(.2,10,by=0.1)
+aJr = Jvloghz 
+phiJ_r = mcmc[iir,vn=="phiJ"]
+SJ = matrix(0,nrow = 1000,ncol=length(NN))
+for(r in 1:1000){
+  haz_J = exp(gamm0 + aJr + ( phiJ_r[r] *NN)^thta_r[r])  
+  SJ[r,] = exp(-1 * (haz_J + exp(gamm0+.5) + exp(gamm0)))
+}
+SJ_mean = colMeans(SJ)
+SJ_lo = apply(SJ, 2, quantile, prob=0.025)
+SJ_hi = apply(SJ, 2, quantile, prob=0.975)
+dpF3 = data.frame(Nmil = NN, S_j = SJ_mean,
+                 S_lo = SJ_lo, S_hi = SJ_hi)
+plF3 = ggplot(dpF3, aes(x=Nmil,y=SJ_mean)) +
+  geom_ribbon(aes(ymin=SJ_lo,ymax=S_hi),alpha=0.3) +
+  geom_line() + labs(x = "Abundance (millions), w/o pups",y="Juvenile survival rate") +
+  ggtitle("Figure 3. Density-dependent variation in juvenile survival") + theme_classic()
+print(plF3)
+```
+
+In addition to density effects, there were also effects of environmental stochasticity and ice cover anomalies on female pregnancy and pup survival. The environmental condition index was positively correlated with fecundity rates, although the 95% CI for $\delta$ encompassed zero suggesting marginal signifance (Table 2). However, there was considerable unexplained variance in fecundity rates, represented by the parameter $\sigma_F$ (Table 1, 2), which corresponds to environmental stochasticity. Ice-cover anomalies were associated with a dramatic reduction in juvenile survival as ice cover dropped to the lowest levels (Fig. 4). 
+
+```{r Fig4, echo=FALSE, warning=FALSE}
+source("Ice_mort_plot.r")
+psi1mn = sumstats[startsWith(vns,"psi1")==T,1]  
+psi1sd = sumstats[startsWith(vns,"psi1")==T,3]  
+ps2mn = sumstats[startsWith(vns,"psi2")==T,1]  
+ps2sd = sumstats[startsWith(vns,"psi2")==T,3]  
+plF4 = Ice_mort_plot(psi1mn,psi1sd,ps2mn,ps2sd)
+plF4 = plF4 + ggtitle("Figure 4. Effect of ice-cover anomalies on juvenile survival")
+print(plF4)
+```
+
+These various environmental and demographic effects, combined with harvest/bycatch mortality, were able to explain most of the temporal variation in the observed data on adult pregancy rates (Fig. 5) and pup abundance (Fig. 6). 
+
+```{r Fig5, echo=FALSE, warning=FALSE}
+dpF5 = data.frame(Year=Year,PRexp=sumstats[startsWith(vns,"Fc8_prdct[")==T,1],
+                 PR_lo = sumstats[startsWith(vns,"Fc8_prdct[")==T,4],
+                 PR_hi = sumstats[startsWith(vns,"Fc8_prdct[")==T,8])
+dpF5$Obs = numeric(length = nrow(dpF5)) 
+dpF5$ObsSE = numeric(length = nrow(dpF5))
+for (i in 1:nrow(df.Rep)){
+  if (df.Rep$Age[i] == 8 & df.Rep$N[i]>=10){
+    ii = which(dpF5$Year==df.Rep$Year[i])
+    dpF5$Obs[ii] = df.Rep$Prob[i]
+    dpF5$ObsSE[ii] = sqrt((df.Rep$Prob[i]*(1-df.Rep$Prob[i]))/df.Rep$N[i])
+  }
+}
+dpF5$Obs[dpF5$ObsSE==0] = NA
+dpF5$ObsSE[dpF5$ObsSE==0] = NA
+plF5 = ggplot(data=dpF5,aes(x=Year,y=PRexp)) +
+  geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Preganancy rate (Age 8+)") +
+  geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
+                                            ymax = Obs+1.96*ObsSE),
+                                            color="darkgrey") +
+  ggtitle("Figure 5. Model estimated vs observed pregnancy rate over time") +
+  theme_classic()
+print(plF5)
+```
+
+```{r Fig6, echo=FALSE, warning=FALSE}
+dpF6 = data.frame(Year=Year,Pexp=sumstats[startsWith(vns,"PredPup[")==T,1],
+                 P_lo = sumstats[startsWith(vns,"PredPup[")==T,4],
+                 P_hi = sumstats[startsWith(vns,"PredPup[")==T,8])
+dpF6$Obs = numeric(length = nrow(dpF6))
+dpF6$ObsSE = numeric(length = nrow(dpF6))
+for (i in 1:nrow(df.Pup)){
+  ii = which(dpF6$Year==df.Pup$Year[i])
+  dpF6$Obs[ii] = df.Pup$Total_Npup[i]
+  dpF6$ObsSE[ii] = df.Pup$Total_se[i]
+}
+dpF6$Obs[dpF6$ObsSE==0] = NA
+dpF6$ObsSE[dpF6$ObsSE==0] = NA
+plF6 = ggplot(data=dpF6,aes(x=Year,y=Pexp)) +
+  geom_ribbon(aes(ymin=P_lo,ymax=P_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Pup counts (total)") +
+  geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-1.96*ObsSE, ymax = Obs+1.96*ObsSE)) +
+  ggtitle("Figure 6. Model estimated vs observed pup counts") + theme_classic()
+print(plF6)
+```
+
+The harvest/byatch hazards varied substantially over the time series, with degree of stochasticity measured by the variance parameter ${\sigma _{HV}}$ (Table 1, 2). On average, the estimated per-capita harvest mortality rates for juvniles (${{\bar \gamma }_{HVJ}}$) were almost double those for adults (${{\bar \gamma }_{HVA}}$ ; Table 2). The estimated annual rates explained virtually all the variation in observed data on harvest/bycatch numbers (Fig. 7). 
+
+```{r Fig7, echo=FALSE, warning=FALSE}
+dpF7 = data.frame(Year=Year, Group = rep("Beaters",length(Year)),
+                 HVexp=sumstats[startsWith(vns,"HVp_pred[")==T,1],
+                 HV_lo = sumstats[startsWith(vns,"HVp_pred[")==T,4],
+                 HV_hi = sumstats[startsWith(vns,"HVp_pred[")==T,8])
+dpF7 = rbind(dpF7, data.frame(Year=Year, Group = rep("Adult",length(Year)),
+                 HVexp=sumstats[startsWith(vns,"HVa_pred[")==T,1],
+                 HV_lo = sumstats[startsWith(vns,"HVa_pred[")==T,4],
+                 HV_hi = sumstats[startsWith(vns,"HVa_pred[")==T,8]))
+dpF7$Obs = numeric(length = nrow(dpF7))
+for (i in 1:nrow(dpF7)){
+  ii = which(df.HV$YEAR==dpF7$Year[i])
+  if(dpF7$Group[i]=="Beaters"){
+    dpF7$Obs[i] = df.HV$PUPTOT[ii]
+  }else{
+    dpF7$Obs[i] = df.HV$ADLTOT[ii]
+  }
+}
+dpF7$Group = as.factor(dpF7$Group)
+plF7 = ggplot(data=dpF7,aes(x=Year,y=HVexp,group=Group,color = Group, fill=Group)) +
+  geom_ribbon(aes(ymin=HV_lo,ymax=HV_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Total harvest + bycatch") +
+  geom_point(aes(y=Obs),size=2) +
+  ggtitle("Figure 7. Model estimated vs observed harvest/bycatch mortality, by age class") + 
+  scale_color_brewer(palette="Dark2") +
+  scale_fill_brewer(palette="Dark2") +
+  theme_classic()
+print(plF7)
+```
+
+While absolute abundance of the harp seal population is not directly measured by empirical data, the model is able to estimate population abundance as a latent variable. The model-estimated trends in population abundance are shown in Fig. 8 (excluding pups-of-the-year) and Fig. 9 (including pups-of-the-year).  
+
+```{r Fig8, echo=FALSE, warning=FALSE}
+dpF8 = data.frame(Year=Yearp,Nexp=sumstats[startsWith(vns,"N[")==T,1],
+                  N_sd = sumstats[startsWith(vns,"N[")==T,2],
+                 N_lo = sumstats[startsWith(vns,"N[")==T,4],
+                 N_hi = sumstats[startsWith(vns,"N[")==T,8])
+dpF8$N2exp = numeric(length = nrow(dpF8))
+dpF8$N2_sd = numeric(length = nrow(dpF8))
+dpF8$N2_lo = numeric(length = nrow(dpF8))
+dpF8$N2_hi = numeric(length = nrow(dpF8))
+for (i in 1:(Nyrs-1)){
+  NTot = mcmc[,which(vn==paste0("N[",i,"]"))] +
+         mcmc[,which(vn==paste0("PredPup[",i,"]"))]
+  dpF8$N2exp[i] = mean(NTot)
+  dpF8$N2_sd[i] = sd(NTot)
+  dpF8$N2_lo[i] = quantile(NTot,probs = 0.025)
+  dpF8$N2_hi[i] = quantile(NTot,probs = 0.975)
+}
+plF8 = ggplot(data=dpF8[1:(Nyrs-1),],aes(x=Year,y=Nexp)) +
+      geom_ribbon(aes(ymin=N_lo,ymax=N_hi),alpha=0.3) +
+      geom_line() + labs(x = "Year",y="Estimated abundance w/o pups") +
+      ggtitle("Figure 8. Model estimated abundance (excluding pups)") + theme_bw()
+print(plF8)
+```
+
+```{r Fig9, echo=FALSE, warning=FALSE}
+plF9 = ggplot(data=dpF8[1:(Nyrs-1),],aes(x=Year,y=N2exp)) +
+  geom_ribbon(aes(ymin=N2_lo,ymax=N2_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Estimated abundance with pups") +
+  ggtitle("Figure 9. Model estimated abundance (including pups)") + theme_bw() 
+print(plF9)
+```
+
+Future projections of population dynamics were made using Monte Carlo simulations of the model. The results were used to estimate the long-term potential equilibrium abundance (K) in the absence of harvest mortality (Table 3) and to identify recomnended TAC values (Table 4) based on the current data and model estimates of all demographic and environmental processes. 
+
+```{r Simulations, include=FALSE}
+# Sims to estimate K
+futuresim = 1; Nyrs2 = 50; Yearst2 = 2020 ; reps = 20000
+PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
+# Future conditions: based on ice and CE indices from after year YY,
+#  fit appropriate random sampling distributions
+N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]
+P_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]
+YY = 2000
+ii = which(df.CE$Year>=YY)
+ft = fitdist(log(df.CE$CEindex[ii])+1,"gamma")
+CE2 = rgamma(1000,coef(ft)[1],coef(ft)[2])-1
+ii = which(df.Ice$Year>=YY)
+ft = fitdist(exp(df.Ice$Gulf_Anom[ii]),"norm")
+icg1 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
+ft = fitdist(exp(df.Ice$Lab_Anom[ii]),"norm")
+icg2 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
+IC2 = as.matrix(cbind(icg1,icg1,icg2))
+sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,
+                  PAmeans=PAmeans,futuresim=futuresim,
+                  NFages=NFages,NFage1=NFage1,Nages=Nages,Nareas=Nareas,
+                  ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,DDadlt=DDadlt,
+                  Adloghz=Adloghz,Jvloghz=Jvloghz,gamm0=gamm0)
+init_fun <- function() {list(sigF=rnorm(1,sumstats[vns=="sigF",1],sumstats[vns=="sigF",2]),                  sigH=rnorm(1,sumstats[vns=="sigH",1],sumstats[vns=="sigH",2]), phiJ=rnorm(1,sumstats[vns=="phiJ",1],sumstats[vns=="phiJ",2]), phiF=rnorm(1,sumstats[vns=="phiF",1],sumstats[vns=="phiF",2]),
+b0=rnorm(1,sumstats[vns=="b0",1],sumstats[vns=="b0",2]),
+b1=rnorm(1,sumstats[vns=="b1",1],sumstats[vns=="b1",2]),
+thta=rnorm(1,sumstats[vns=="thta",1],sumstats[vns=="thta",2]),
+psi1=rnorm(1,sumstats[vns=="psi1",1],sumstats[vns=="psi1",2]),
+psi2=rnorm(1,sumstats[vns=="psi2",1],sumstats[vns=="psi2",2]),
+dlta=rnorm(1,sumstats[vns=="dlta",1],sumstats[vns=="dlta",2]),
+gammHp_mn=rnorm(1,sumstats[vns=="gammHp_mn",1],sumstats[vns=="gammHp_mn",2]),
+gammHa_mn=rnorm(1,sumstats[vns=="gammHa_mn",1],sumstats[vns=="gammHa_mn",2])
+)}
+#
+cores=detectCores()
+cl <- makeCluster(min(20,cores[1]-1))
+registerDoParallel(cl)
+source("HSmod_sim.r")
+rslt=HSmod_sim(init_fun,sim.data,sumstats,vns)
+N_Predict = rslt$N_Predict
+P_Predict = rslt$P_Predict
+P_Predict = rbind(P_Predict,colMeans(P_Predict[(Nyrs2-4):(Nyrs2-1),]))
+Np_Predict = 1.1*(N_Predict + P_Predict)
+Nfin = colMeans(Np_Predict[(Nyrs2-20):Nyrs2,])
+Kest = mean(Nfin)
+Kest_sd = sd(Nfin)
+Kest_CI = quantile(Nfin, prob=c(0.025,0.975))
+#
+# Sims to set TAC values
+futuresim = 2 # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
+Nyrs2 = 15; Yearst2 = 2020 ;
+PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
+# Set other human mortality not included in Canadian harvest
+GrnH = 50000
+Grn_A = .857*GrnH
+Grn_P = .143*GrnH
+ArcH = 1000
+Arc_A = .95*ArcH
+Arc_P = .05*ArcH
+Byctc = 2000
+Byc_A = .2*Byctc
+Byc_P = .8*Byctc
+# Future conditions: based on ice and CE indices from after year YY,
+#  fit appropriate random sampling distributions
+YY = 2000
+ii = which(df.CE$Year>=YY)
+ft = fitdist(log(df.CE$CEindex[ii])+1,"gamma")
+CE2 = rgamma(1000,coef(ft)[1],coef(ft)[2])-1
+ii = which(df.Ice$Year>=YY)
+ft = fitdist(exp(df.Ice$Gulf_Anom[ii]),"norm")
+icg1 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
+ft = fitdist(exp(df.Ice$Lab_Anom[ii]),"norm")
+icg2 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
+IC2 = as.matrix(cbind(icg1,icg1,icg2))
+#
+N_all = sumstats[which(startsWith(vns,"N[")),1]
+N70 = 0.7*max(N_all)
+N50 = 0.5*max(N_all)
+sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,
+                  PAmeans=PAmeans,futuresim=futuresim,
+                  NFages=NFages,NFage1=NFage1,Nages=Nages,Nareas=Nareas,
+                  ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,DDadlt=DDadlt,
+                  Adloghz=Adloghz,Jvloghz=Jvloghz,gamm0=gamm0,
+                  Grn_A=Grn_A,Grn_P=Grn_P,Arc_A=Arc_A,Arc_P=Arc_P,
+                  Byc_A=Byc_A,Byc_P=Byc_P)
+rslt=HSmod_sim(init_fun,sim.data,sumstats,vns)
+N_Predict = rslt$N_Predict
+Hvp = rslt$HVp_predict
+Hva = rslt$HVa_predict
+Hvp_k = apply(Hvp,2,mean)/1000
+Hva_k = apply(Hva,2,mean)/1000
+ii = which(Hvp_k>0 & Hva_k>0)
+HvT = Hvp_k[ii]+Hva_k[ii]
+ppA = Hva_k[ii]/HvT
+Nmin = apply(N_Predict,2,min); Nmin = Nmin[ii]
+dat = data.frame(Nmin=Nmin,HvT=HvT,ppA=ppA)
+fit1 = lm(Nmin~HvT+ppA, data=dat)
+# summary(fit1)
+# predtest = predict(fit1,newdata = dat)
+# plot(predtest,Nmin)
+# abline(coef = c(0,1))
+HvTeval = seq(51,1000)
+newdat05ad = data.frame(HvT=HvTeval,ppA=rep(.05,950))
+newdat10ad = data.frame(HvT=HvTeval,ppA=rep(.1,950))
+newdat50ad = data.frame(HvT=HvTeval,ppA=rep(.5,950))
+pred05ad = predict(fit1,newdata = newdat05ad,se.fit=T,interval = "prediction",level = 0.8)$fit
+pred10ad = predict(fit1,newdata = newdat10ad,se.fit=T,interval = "prediction",level = 0.8)$fit
+pred50ad = predict(fit1,newdata = newdat50ad,se.fit=T,interval = "prediction",level = 0.8)$fit
+ii = which(abs(pred05ad[,2]-(N70+1000))==min(abs(pred05ad[,2]-(N70+1000))))
+TACN70pa05 = floor(HvTeval[ii]/5)*5
+ii = which(abs(pred05ad[,2]-(N50+1000))==min(abs(pred05ad[,2]-(N50+1000))))
+TACN50pa05 = floor(HvTeval[ii]/5)*5
+ii = which(abs(pred10ad[,2]-(N70+1000))==min(abs(pred10ad[,2]-(N70+1000))))
+TACN70pa10 = floor(HvTeval[ii]/5)*5
+ii = which(abs(pred10ad[,2]-(N50+1000))==min(abs(pred10ad[,2]-(N50+1000))))
+TACN50pa10 = floor(HvTeval[ii]/5)*5
+ii = which(abs(pred50ad[,2]-(N70+1000))==min(abs(pred50ad[,2]-(N70+1000))))
+TACN70pa50 = floor(HvTeval[ii]/5)*5
+ii = which(abs(pred50ad[,2]-(N50+1000))==min(abs(pred50ad[,2]-(N50+1000))))
+TACN50pa50 = floor(HvTeval[ii]/5)*5
+#
+stopCluster(cl)
+```
+
+```{r Table3, echo=FALSE}
+Ktab = data.frame(Metric = "Current abundance",
+                  Mean = dpF8$N2exp[Nyrs-1]/1000000,
+                  SD = dpF8$N2_sd[Nyrs-1]/1000000,
+                  CI95_low=dpF8$N2_lo[Nyrs-1]/1000000,
+                  CI95_high=dpF8$N2_hi[Nyrs-1]/1000000)
+Ktab = rbind(Ktab, data.frame(Metric = "Equilibrium abundance",
+                  Mean = Kest/1000000, SD = Kest_sd/1000000,
+                  CI95_low=Kest_CI[1]/1000000,CI95_high=Kest_CI[2]/1000000))
+row.names(Ktab) = NULL
+kable(Ktab,digits=3,
+      caption="Table 3: Current abundance and estimated potential equilibrium abundance (K) in millions of animals")
+```
+
+```{r Table4, echo=FALSE}
+TACtab = data.frame(Pcnt_adlt=c(5,10,50),
+                    TAC_N70 = c(TACN70pa05,TACN70pa10,TACN70pa50),
+                    TAC_N50 =c(TACN50pa05,TACN50pa10,TACN50pa50))
+kable(TACtab,digits=3,
+      caption="Table 4: Recomended TAC values (in thousands of animals)")
+```
+
+## References
+* Beyersmann, J., A. Latouche, A. Buchholz, and M. Schumacher. 2009. Simulating competing risks data in survival analysis. Statistics in medicine 28:956-971.
+* Brodie, J., H. Johnson, M. Mitchell, P. Zager, K. Proffitt, M. Hebblewhite, M. Kauffman, B. Johnson, J. Bissonette, and C. Bishop. 2013. Relative influence of human harvest, carnivores, and weather on adult female elk survival across western N orth A merica. Journal of Applied Ecology 50:295-305.
+* Carpenter, B., A. Gelman, M. D. Hoffman, D. Lee, B. Goodrich, M. Betancourt, M. Brubaker, J. Guo, P. Li, and A. Riddell. 2017. Stan: A Probabilistic Programming Language. 2017 76:32.
+* Gelfand, A. E., S. K. Ghosh, C. Christiansen, S. B. Soumerai, and T. J. McLaughlin. 2000. Proportional hazards models: a latent competing risk approach. Journal of the Royal Statistical Society: Series C (Applied Statistics) 49:385-397.
+* Gelman, A. 2006. Prior distributions for variance parameters in hierarchical models (comment on article by Browne and Draper). Bayesian analysis 1:515-534.
+* Gelman, A., A. Jakulin, M. G. Pittau, and Y.-S. Su. 2008. A weakly informative default prior distribution for logistic and other regression models. The Annals of Applied Statistics 2:1360-1383.
+* Heisey, D. M., and B. R. Patterson. 2006. A Review of Methods to Estimate Cause-Specific Mortality in Presence of Competing Risks. Journal of Wildlife Management 70:1544-1555.
+
+
