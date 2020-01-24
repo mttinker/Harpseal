@@ -3,14 +3,14 @@ title: "Bayesian Harp Seal Model"
 author: "Prepared for Department of Fisheries and Oceans by M. Tim Tinker"
 date: "1/22/2020"
 output:
-  html_document: 
-    fig_width: 9
-  pdf_document: 
-    fig_width: 7
-    toc: yes
   word_document: 
     fig_width: 7
     toc: yes
+  pdf_document: 
+    fig_width: 7
+    toc: yes
+  html_document: 
+    fig_width: 9
 editor_options:
   chunk_output_type: console
 ---
@@ -528,7 +528,7 @@ TACtab = data.frame(Pcnt_adlt=c(5,10,50),
                     TAC_N70 = c(TACN70pa05,TACN70pa10,TACN70pa50),
                     TAC_N50 =c(TACN50pa05,TACN50pa10,TACN50pa50))
 kable(TACtab,digits=3,
-      caption="Table 4: Recomended TAC values (in thousands of animals)")
+      caption="Table 4: Recommended TAC values (in thousands of animals)")
 ```
 
 ## References
