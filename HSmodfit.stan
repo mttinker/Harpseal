@@ -1,8 +1,8 @@
 // HSmodfit
-// This Stan program describes a harp seal population model 
-//  [More explanation to go here] 
+// This Stan code executes a harp seal population model 
+//  [Refer to "HSmodel_summary" for details] 
 //
-// Data inputs for model
+// Section 1. Data inputs for model
 data {
   int<lower=1> NPcts;             // N counts of pups, total (across 3 areas)
   int<lower=1> NFages;            // N female age classes (3 - 8+) for age composition obs 
@@ -33,7 +33,6 @@ data {
   real N0pri ;                    // prior estimate of starting abundance
   real gamm0;                     // Nuiscence param: base log hazards
   real DDadlt[Nages] ;            // age-sepcific scaling factor for adult D-D 
-  real<lower=0> b0pri;            // Fecundity: Logit of max adult pregancy rate
   real<lower=0> psipri1a ;        // Ice anomaly effect on pup survival, fxn param 1 mn
   real<lower=0> psipri1b ;        // Ice anomaly effect on pup survival, fxn param 2 sd
   real<lower=0> psipri2a ;        // Ice anomaly effect on pup survival, fxn param 1 mn
@@ -49,7 +48,7 @@ transformed data {
   gammA = Adloghz;
   gammJ = Jvloghz ;    
 }
-// The parameters to be estimated 
+// Section 2. The parameters to be estimated 
 parameters {
   // Annual proportion of pups in areas 1 and 2, predicted
   vector<lower=0,upper=0.45>[Nyrs-1] PA1 ; 
@@ -61,7 +60,7 @@ parameters {
   real<lower=0,upper=0.5> b1;     // Fecundity: age effect (reduced for younger)
   real<lower=0> psi1;             // Ice anomaly effect on pup survival, fxn param 1 
   real<lower=0> psi2;             // Ice anomaly effect on pup survival, fxn param 2 
-  real<lower=100000> N0;          // Initial Abundance, year 1
+  real<lower=100000> N0;          // Initial Abundance, year 1 of time series
   real dlta;                      // Effect of environmental conditions on fecundity
   real<lower=0> sigF;             // Environmental stocasticity, var in pregnancy rates
   real epsF[Nyrs-1];              // Stochastic effects on fecundity, by year
@@ -72,11 +71,10 @@ parameters {
   real gammHp[Nyrs-1];            // Annual harvest log hazard rate, Juvenile (beaters)
   real gammHa[Nyrs-1];            // Annual harvest log hazard rate, Adults (age 1+)
 }
-// Additional transformed parameters, including calculations for model dynamics
+// Section 3. Additional transformed parameters, including key model dynamics
 transformed parameters {
   matrix[Nyrs-1,Nareas] PA;             // predicted pup proportions by area & year 
   real<lower=0> N[Nyrs] ;               // Population abundance by year
-  real<lower=0> Nml[Nyrs] ;             // Population abundance by year in millions
   vector<lower=0>[Nages] n[Nyrs] ;      // Population vector, by year
   vector<lower=0>[Nages] Fc[Nyrs-1] ;    // Fecundity vector, by year
   vector<lower=0>[Nareas] Sice[Nyrs-1] ;// Juv survival from ice anomalies (cause specific)
@@ -89,12 +87,12 @@ transformed parameters {
   PA[,1] = PA1;
   PA[,2] = PA2;
   PA[,3] = rep_vector(1,Nyrs-1) - (PA1 + PA2);
-  N[1] = N0 ;
-  Nml[1] = N[1]/1000000 ;
-  n[1] = sad0 * N[1];
+  N[1] = N0 ;                     // Initialize population, year 1
+  n[1] = sad0 * N[1];             // Initialize population vector, year 1
   // Loop through years to calculate demographic transitions and population dynamics 
   for (i in 1:(Nyrs-1)){
     // Declare some temporary variables for this year:
+    real Nml ;                    // Current population abundance in millions
     real haz_J ;                  // Juv baseline hazards
     vector[Nages] haz_A ;         // Adult baseline hazards    
     row_vector[Nareas] gammIce ;  // Area specific log hazards from ice
@@ -106,21 +104,24 @@ transformed parameters {
     vector[Nages] prp_HV_a ;      // Proportion of mortality comprised of harvest, Adult 
     vector[Nages] nt1 ;           // pop vector (temporary)
     row_vector[Nareas] PAi ;      // annual proportional pup allocation to area
-    // row_vector[Nareas] PredPupA ; // annual number pups counted by area
     real npsv ;                   // Early pup survival (pre-survey)
-    // Use observed pup allocation for years available, otherwise use estimated
+    //
+    Nml = N[i]/1000000 ;
+    //
+    // for PA, Use observed pup allocation when available, otherwise use estimated
     if (PAtag[i]==1){
       PAi =  NPA[i,1:Nareas] ;
     }else{
       PAi =  PA[i,1:Nareas] ;
     }
+    // Newborn pup survival for current year (stochastic)
     npsv = 1-(inv_logit(nphz[i])/10) ;
-    // Fecundity (compared with observed pregnancy rate: adjust for abortions?)
+    // Annual Fecundity, with D-D, envir. effects and stochasticity 
     Fc[i][1:2] = rep_vector(0,2) ;
-    Fc[i][3:Nages] = inv_logit(b0 - b1 * square(Nages-ages[3:Nages]) - pow(phiF*Nml[i],thta) 
-                + dlta*CE[i]*(Nml[i]) + epsF[i]) ;
+    Fc[i][3:Nages] = inv_logit(b0 - b1 * square(Nages-ages[3:Nages]) 
+               - pow(phiF*Nml,thta) + dlta*CE[i]*Nml + epsF[i]) ;
     // Juvenile competing hazards and net realized survival
-    haz_J = exp(gamm0 + gammJ + pow(phiJ*Nml[i], thta)) ; // + epsJ[i]
+    haz_J = exp(gamm0 + gammJ + pow(phiJ*Nml, thta)) ; // + epsJ[i]
     for(a in 1:Nareas){ 
        gammIce[a] = psi1 * pow((1/exp(IC[i,a])), psi2) - 1 ;
        Sice[i][a] = exp(-1 * exp(gamm0 + gammIce[a])) ;
@@ -131,81 +132,73 @@ transformed parameters {
     SJ[i] = exp(-1 * (haz_J + haz_I + haz_HVp)) ;
     // Adult competing hazards and net realized survival
     for (a in 1:Nages){
-      haz_A[a] = exp(gamm0 + gammA + pow(DDadlt[a]*phiJ*Nml[i],thta) ) ;
+      haz_A[a] = exp(gamm0 + gammA + pow(DDadlt[a]*phiJ*Nml,thta) ) ;
     }
     haz_HVa = exp(gamm0 + gammHa[i]) ;
     S[i] = exp(-1 * (haz_A + haz_HVa)) ;    
-    // Calculations for proportional mortality from harvest
+    // Calculate proportional mortality from harvest
     prp_HV_p = haz_HVp / (haz_J + haz_I + haz_HVp) ;
-    HVp_pred[i] = sum((n[i] .* Fc[i])) * 0.5 * npsv * (1 - SJ[i]) * prp_HV_p ;
     prp_HV_a = haz_HVa ./ (haz_A + haz_HVa) ;
+    // Calculate predicted total harvest/bycatch numbers
+    HVp_pred[i] = sum((n[i] .* Fc[i])) * 0.5 * npsv * (1 - SJ[i]) * prp_HV_p ;
     HVa_pred[i] = sum((n[i] .* (1 - S[i])) .* prp_HV_a) ;
     // Annual demographic transitions
     nt1[1] = sum((n[i] .* Fc[i])) * 0.5 * npsv * SJ[i] ;
     nt1[2:(Nages-1)] = n[i][1:(Nages-2)] .* S[i][1:(Nages-2)] ;
     nt1[Nages] = n[i][Nages-1] * S[i][Nages-1] + n[i][Nages] * S[i][Nages] ;    
-    n[i+1] = nt1  ;
-    N[i+1] = sum(n[i+1]) ;
-    Nml[i+1] = N[i+1]/1000000 ;    
     // Female predicted age vector (ages 3 - 8+), for year i
     FmAgeVec[i] = n[i][NFage1:Nages] / (0.00001 + sum(n[i][NFage1:Nages])) ;
-    // Predicted Pups to be surveyed (allowing for some early season ice mortality), 
-    //     by area and total, for year i 
-    // for (a in 1:Nareas){
-    //   PredPupA[a] = sum((n[i] .* Fc[i])) * 0.5 * npsv * PAi[a];//  * sqrt(Sice[i][a])
-    // }
+    // Predicted Pups to be surveyed (allowing for pre-survey pup mortality), 
     PredPup[i] = sum((n[i] .* Fc[i])) * 0.5 * npsv ;
+    // Update population vector and total abundance for next year
+    n[i+1] = nt1  ;
+    N[i+1] = sum(n[i+1]) ;    
   }
 }
-// The model parameters, estimated by fitting to data
+// Section 4. Estimating model parameters (drawing from probability distributions)
 model {
-  // Observed nodes:
-  // Harvest estimates
+  // A) Observed nodes:
+  //  Harvest estimates
   for (i in 1:(Nyrs-1)){
     HVp[i] ~ normal(HVp_pred[i],HVp_pred[i]*CV_HV);
     HVa[i] ~ normal(HVa_pred[i],HVa_pred[i]*CV_HV);
   }
-  // Annual pup counts, total 
+  //  Annual pup counts
   for (i in 1:NPcts){
     NP[i] ~ normal(PredPup[YrPct[i]], sdNP[i]) ;
   }
-  // Female age distributions (multinomial dist)
+  //  Female age distributions by year (multinomial dist)
   for(i in 1:NFobs){
     AgeF[i,] ~ multinomial(FmAgeVec[YrAGsmp[i]]) ;
   }
-  // Female pregancy status (binomial dist)
+  //  Pregancy status of females by age/year (binomial dist)
   for(i in 1:NPRobs){
     Nprg[i] ~ binomial(NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
   }
-  //
-  //Prior distributions for model parameters:
-  // Initial Population size (stochastic node, weak prior):
-  N0 ~ gamma( square(N0pri)/square(N0pri*.25) , N0pri/square(N0pri*.25));  
-  // Random effects: fecundity and newborn pup survival (env. stochasticity) 
-  epsF ~ normal(0,sigF) ;
-  nphz ~ normal(0,1) ;
-  // Annual harvest log hazard rates
-  gammHp ~ normal(gammHp_mn,sigH);
-  gammHa ~ normal(gammHa_mn,sigH);
-  // Estimated annual proportion of pups for areas 1 and 2 
-  //  for years not observed: Area 3 calculated as 1-(PA1+PA2) 
-  PA1 ~ beta(PApri[1,1],PApri[1,2]) ;
-  PA2 ~ beta(PApri[2,1],PApri[2,2]) ;
-  // key parameters of interest
+  // B) Prior distributions for model parameters:
+  // Hierarchical random effects:  
+  epsF ~ normal(0,sigF) ;          // Annual deviations from mean fecundity
+  nphz ~ normal(0,1) ;             // Annual pre-survey newborn hazards
+  gammHp ~ normal(gammHp_mn,sigH); // Annual pup harvest log hazards
+  gammHa ~ normal(gammHa_mn,sigH); // Annual adult harvest log hazards
+  PA1 ~ beta(PApri[1,1],PApri[1,2]) ; // Annual proportion of pups area 1
+  PA2 ~ beta(PApri[2,1],PApri[2,2]) ; // Annual proportion of pups area 2
+  // Base parameters:
+  N0 ~ gamma( square(N0pri)/square(N0pri*.25) , N0pri/square(N0pri*.25));   
   thta ~ gamma(3,2) ;
   phiJ ~ cauchy(0,0.5) ;
   phiF ~ cauchy(0,0.5) ;
-  b0 ~ normal(b0pri,.5);
-  b1 ~ normal(0.2,0.1) ;
+  b0 ~ cauchy(0,2.5) ;
+  b1 ~ cauchy(0,.25) ;
   psi1 ~ normal(psipri1a,psipri1b) ;
   psi2 ~ normal(psipri2a,psipri2b) ;
   dlta ~ cauchy(0,.25) ;
   sigF ~ cauchy(0,1.5) ;
   sigH ~ cauchy(0,1.5) ;
-  gammHp_mn ~ normal(5.9,2) ;
-  gammHa_mn ~ normal(3.3,1.5) ;
+  gammHp_mn ~ cauchy(0,5) ;
+  gammHa_mn ~ cauchy(0,5) ;
 }
-// Derived params (e.g. goodness of fit stats)
+// Section 5. Derived parameters and statistics 
 generated quantities {
   real PAmean[Nareas] ;  /// mean PA values
   real Fc8_prdct[Nyrs-1] ;  // Predicted fecundity rate for 8+ over years

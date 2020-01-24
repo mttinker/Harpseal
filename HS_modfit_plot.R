@@ -1,6 +1,7 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):
-load(file="Results.rdata")
+loadfile = file.choose(new = FALSE)
+load(file=loadfile)
 #
 require(readxl)
 require(stats)
@@ -11,6 +12,8 @@ require(lattice)
 require(coda)
 require(ggplot2)
 require(bayesplot)
+library(foreach)
+library(doParallel)
 Year = seq(Year1,Year1+Nyrs-2)
 Yearp = seq(Year1,Year1+Nyrs-1)
 # Pop trends ----------------------------------------------------------------
@@ -61,11 +64,12 @@ PR2016 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][66]
 PR2016per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][50:69],na.rm = T)
 crct2 = PR2016per/PR2016
 
-dp3 = data.frame(Age=ages, Year = (rep(1966,Nages)),
+dp3 = data.frame(Age=ages, Year = (rep(1966,Nages)),Period=rep("1951-1985",Nages),
                  PRexp=sumstats[startsWith(vns,"Fc1966_prdct[")==T,1]*crct1,
                  PR_lo = sumstats[startsWith(vns,"Fc1966_prdct[")==T,4]*crct1,
                  PR_hi = sumstats[startsWith(vns,"Fc1966_prdct[")==T,8]*crct1)
 dp3 = rbind(dp3, data.frame(Age=ages, Year = (rep(2016,Nages)),
+                 Period=rep(paste0("1990-",YearT-1),Nages),           
                  PRexp=sumstats[startsWith(vns,"Fc2016_prdct[")==T,1]*crct2,
                  PR_lo = sumstats[startsWith(vns,"Fc2016_prdct[")==T,4]*crct2,
                  PR_hi = sumstats[startsWith(vns,"Fc2016_prdct[")==T,8]*crct2))
@@ -77,14 +81,19 @@ for (i in 1:nrow(dp3)){
   dp3$Obs[i] = mean(df.Rep$Prob[ii])
   dp3$ObsSE[i] = sd(df.Rep$Prob[ii])/sqrt(length(df.Rep$Prob[ii]))
 }
-dp3$Year = as.factor(dp3$Year)
-pl3 = ggplot(data=dp3,aes(x=Age,y=PRexp,group=Year,color = Year, fill=Year)) +
+dp3$Year = as.factor(dp3$Year); dp3$Period = as.factor(dp3$Period)
+pl3 = ggplot(data=dp3,aes(x=Age,y=PRexp,group=Period,color = Period, fill=Period)) +
   geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) + ylim(0,1) +
   geom_line() + labs(x = "Age",y="Pregnancy rate") +
   geom_point(aes(y=Obs),size=2) +
   geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
                       ymax = Obs+1.96*ObsSE),width=.2) +
-  ggtitle("Model estimated vs observed pregancy rates by age (early vs late time series)") + theme_classic()
+  ggtitle("Model estimated vs observed pregancy rates by age",
+          subtitle = "Low density vs. high density population") + 
+  # scale_color_discrete(palette="Harmonic") +
+  scale_color_brewer(palette="Dark2") +
+  scale_fill_brewer(palette="Dark2") +
+  theme_classic() 
 print(pl3)
 #
 # Preg rate 8+ over time----------------------------------------------------
@@ -106,8 +115,10 @@ pl4 = ggplot(data=dp4,aes(x=Year,y=PRexp)) +
   geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Preganancy rate (Age 8+)") +
   geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
-                                             ymax = Obs+1.96*ObsSE),color="darkgrey") +
-  ggtitle("Model estimated vs observed pregnancy rate over time") + theme_classic()
+                                            ymax = Obs+1.96*ObsSE),
+                                            color="darkgrey") +
+  ggtitle("Model estimated vs observed pregnancy rate over time") +
+  theme_classic()
 print(pl4)
 #
 # Harvest mortality over time ---------------------------------------------
@@ -133,7 +144,10 @@ pl5 = ggplot(data=dp5,aes(x=Year,y=HVexp,group=Group,color = Group, fill=Group))
   geom_ribbon(aes(ymin=HV_lo,ymax=HV_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Total harvest + bycatch") +
   geom_point(aes(y=Obs),size=2) +
-  ggtitle("Model estimated vs observed harvest/bycatch mortality, by age class") + theme_classic()
+  ggtitle("Model estimated vs observed harvest/bycatch mortality, by age class") + 
+  scale_color_brewer(palette="Dark2") +
+  scale_fill_brewer(palette="Dark2") +
+  theme_classic()
 print(pl5)
 #
 # Ice anomaly effect on pup survival---------------------------------------
@@ -191,24 +205,33 @@ print(pl7)
 #
 # Evaluate model sims-----------------------------------------------------
 # Simulate future data with or without harvest mort
-futuresim = 1; # 0 = current level of harvest, 1 = no harvest (for estimating K)
-Nyrs2 = 50; Yearst2 = 2020 ; reps = 500
+futuresim = 1; # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
+Nyrs2 = 50; Yearst2 = 2020 ; reps = 10000
 PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
-# Future conditions: sample ice and CE indices from after year YY 
-YY = 1969
-ii = which(df.CE$Year>=YY)
-CE2 = log(df.CE$CEindex[sample(ii,1000,replace=T)])
-ii = which(df.Ice$Year>=YY)
-IC2 = as.matrix(cbind(df.Ice$Gulf_Anom[sample(ii,1000,replace=T)],
-                      df.Ice$Gulf_Anom[sample(ii,1000,replace=T)],
-                      df.Ice$Lab_Anom[sample(ii,1000,replace=T)]))
-#
-N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]
-stan.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,
+# Future conditions: based on ice and CE indices from after year YY, 
+#  fit appropriate random sampling distributions
+if(Yearst2==Year1 & Nyrs2==Nyrs){
+  N_end = N0pri
+  IC2=IC
+  CE2=CE
+}else{
+  N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]  
+  YY = 2000
+  ii = which(df.CE$Year>=YY)
+  ft = fitdist(log(df.CE$CEindex[ii])+1,"gamma")
+  CE2 = rgamma(1000,coef(ft)[1],coef(ft)[2])-1
+  ii = which(df.Ice$Year>=YY)
+  ft = fitdist(exp(df.Ice$Gulf_Anom[ii]),"norm")
+  icg1 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
+  ft = fitdist(exp(df.Ice$Lab_Anom[ii]),"norm")
+  icg2 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
+  IC2 = as.matrix(cbind(icg1,icg1,icg2))
+}
+sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,
                   PAmeans=PAmeans,futuresim=futuresim,
                   NFages=NFages,NFage1=NFage1,Nages=Nages,Nareas=Nareas,
                   ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,DDadlt=DDadlt,
-                  b0pri=b0pri,Adloghz=Adloghz,Jvloghz=Jvloghz,gamm0=gamm0) #thta=thta
+                  Adloghz=Adloghz,Jvloghz=Jvloghz,gamm0=gamm0) 
 init_fun <- function() {list(sigF=rnorm(1,sumstats[vns=="sigF",1],sumstats[vns=="sigF",2]),
                              sigH=rnorm(1,sumstats[vns=="sigH",1],sumstats[vns=="sigH",2]),
                              phiJ=rnorm(1,sumstats[vns=="phiJ",1],sumstats[vns=="phiJ",2]),
@@ -223,14 +246,17 @@ init_fun <- function() {list(sigF=rnorm(1,sumstats[vns=="sigF",1],sumstats[vns==
                              gammHa_mn=rnorm(1,sumstats[vns=="gammHa_mn",1],sumstats[vns=="gammHa_mn",2])
 )}
 #
+cores=detectCores()
+cl <- makeCluster(min(20,cores[1]-1)) 
+registerDoParallel(cl)
 source("HSmod_sim.r")
+rslt=HSmod_sim(init_fun,sim.data,sumstats,vns)
 Yearp2 = seq(Yearst2,Yearst2+Nyrs2-1)
-rslt=HSmod_sim(init_fun,stan.data)
 N_Predict = rslt$N_Predict
 P_Predict = rslt$P_Predict
 P_Predict = rbind(P_Predict,colMeans(P_Predict[(Nyrs2-4):(Nyrs2-1),]))
-Np_Predict = N_Predict + P_Predict
-Nfin = colMeans(Np_Predict[(Nyrs2-10):Nyrs2,])
+Np_Predict = 1.1*(N_Predict + P_Predict)
+Nfin = colMeans(Np_Predict[(Nyrs2-20):Nyrs2,])
 Kest = mean(Nfin)
 Kest_sd = sd(Nfin)
 Kest_CI = quantile(Nfin, prob=c(0.025,0.975))
@@ -242,13 +268,13 @@ if (futuresim == 0){
   subtxt = " "
 }else if (futuresim == 1){
   titletxt = "Model projected abundance with zero harvest (including pups)"
-  subtxt =  paste0("Estimated K = ", format(Kest/1000000,digits = 4),
-                            "million (", format(Kest_CI[1]/1000000,digits = 4),
-                            " - ", format(Kest_CI[2]/1000000,digits = 4),")")
+  subtxt =  paste0("Estimated long-term equilibrium (K) = ", format(Kest/1000000,digits = 3),
+                            "million (CI95 = ", format(Kest_CI[1]/1000000,digits = 3),
+                            " - ", format(Kest_CI[2]/1000000,digits = 3),")")
 }
 plNprd = ggplot(data=dpNprd,aes(x=Year,y=N_pred_mean)) +
   geom_ribbon(aes(ymin=N_pred_lo,ymax=N_pred_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Projected abundance") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plNprd)
-
+stopCluster(cl)
