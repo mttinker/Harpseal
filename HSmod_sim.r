@@ -42,7 +42,9 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
   if (futuresim==2){
     # random multipliers for harvest hazards,
     # used to increase range of values considered
+    set.seed(123)
     ig1 = runif(reps,.5,1.5)
+    set.seed(321)
     ig2 = runif(reps,.8,1.5)
   }
   iy = c(rep(1,20),seq(2,Nyrs-1))
@@ -60,11 +62,10 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
   #
   # Loop through random iterations of model
   #  using Parallel processing to speed things up
-  simresults = foreach(r=1:reps) %dopar% {
+  set.seed(123)
+  simresults = foreach(r=1:reps) %dorng% {
     sumstats = sumstats1
     vns=vns1
-    rseed = 100+r
-    set.seed(rseed)    
     pars = init_fun()
     for(i in 1:length(pars)){
       ##first extract the object value

@@ -14,6 +14,7 @@ require(ggplot2)
 require(bayesplot)
 library(foreach)
 library(doParallel)
+library(doRNG)
 Year = seq(Year1,Year1+Nyrs-2)
 Yearp = seq(Year1,Year1+Nyrs-1)
 # Pop trends ----------------------------------------------------------------
