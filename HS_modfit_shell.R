@@ -125,7 +125,7 @@ rm(i,ii,y,aa,ft)
 #
 # Set up Jags inputs --------------------------------------------------------
 #
-fitmodel = c("HSmodfitVP.stan")
+fitmodel = c("HSmodfit.stan")
 #  
 stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
                   NFobs=NFobs,NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
