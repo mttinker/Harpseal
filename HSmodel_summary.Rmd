@@ -22,10 +22,10 @@ This report summarizes the results of an analysis of harp seal demographic param
 existing_Packages<-as.list(installed.packages()[,1])
 # Add new packages you might need to this line, to check if they're installed and install missing packages
 required_Packages<-c("knitr","readxl", "gtools", "stats", "dplyr", "ggplot2", "fitdistrplus")
-missing_Packages<- required_Packages[!required_Packages%in% existing_Packages]
-if(length(missing_Packages)>0)install.packages(pkgs =  missing_Packages)
+#missing_Packages<- required_Packages[!required_Packages%in% existing_Packages]
+#if(length(missing_Packages)>0)install.packages(pkgs =  missing_Packages, repos = "http://cran.us.r-project.org")
 invisible(lapply(required_Packages, require, character.only=T,quietly = T))
-rm(existing_Packages, missing_Packages, required_Packages)
+#rm(existing_Packages, missing_Packages, required_Packages)
 #
 # Load results file
 load(file="Results.rdata")

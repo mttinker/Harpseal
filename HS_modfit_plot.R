@@ -1,5 +1,5 @@
 # Script to plot some results from model fitting
-# Load results file (if not already loaded into workspace):
+# Load results file (if not already loaded into workspace):---
 loadfile = file.choose(new = FALSE)
 load(file=loadfile)
 #
@@ -207,7 +207,7 @@ print(pl7)
 # Evaluate model sims-----------------------------------------------------
 # Simulate future data with or without harvest mort
 futuresim = 1; # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
-Nyrs2 = 50; Yearst2 = 2020 ; reps = 10000
+Nyrs2 = 50; Yearst2 = 2020 ; reps = 5000
 PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
 # Future conditions: based on ice and CE indices from after year YY, 
 #  fit appropriate random sampling distributions
