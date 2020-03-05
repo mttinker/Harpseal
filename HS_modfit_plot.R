@@ -21,24 +21,40 @@ Yearp = seq(Year1,Year1+Nyrs-1)
 dp1 = data.frame(Year=Yearp,Nexp=sumstats[startsWith(vns,"N[")==T,1],
                  N_lo = sumstats[startsWith(vns,"N[")==T,4],
                  N_hi = sumstats[startsWith(vns,"N[")==T,8])
-
 dp1$N2exp = c(dp1$Nexp[1:(Nyrs-1)] + sumstats[startsWith(vns,"PredPup[")==T,1],NA)
 dp1$N2_lo = c(dp1$N_lo[1:(Nyrs-1)] + sumstats[startsWith(vns,"PredPup[")==T,4],NA)
 dp1$N2_hi = c(dp1$N_hi[1:(Nyrs-1)] + sumstats[startsWith(vns,"PredPup[")==T,8],NA)
+tmp = read_excel("./data/OldMod_N.xlsx")
+dp1$N3exp = tmp$N3exp
+dp1$N3_lo = tmp$N3_lo
+dp1$N3_hi = tmp$N3_hi
+tmp = read_excel("./data/OldMod_N2.xlsx")
+dp1$N4exp = tmp$N3exp
+dp1$N4_lo = tmp$N3_lo
+dp1$N4_hi = tmp$N3_hi
+
 
 pl1 = ggplot(data=dp1[1:(Nyrs-1),],aes(x=Year,y=Nexp)) +
       geom_ribbon(aes(ymin=N_lo,ymax=N_hi),alpha=0.3) +
       geom_line() + labs(x = "Year",y="Estimated abundance w/o pups") +
       ggtitle("Model estimated abundance (excluding pups)") + theme_bw()
 print(pl1)
-pl1b = ggplot(data=dp1[1:(Nyrs-1),],aes(x=Year,y=N2exp)) +
+pl1b = ggplot(data=dp1,aes(x=Year,y=N2exp)) +
   geom_ribbon(aes(ymin=N2_lo,ymax=N2_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Estimated abundance with pups") +
-  ggtitle("Model estimated abundance (including pups)") + theme_bw() 
+  # geom_line(aes(y=N3exp),linetype=2,colour = "red",size=1.1) +
+  # geom_line(aes(y=N3_lo),linetype=3,colour = "red",size=1.1) +
+  # geom_line(aes(y=N3_hi),linetype=3,colour = "red",size=1.1) +  
+  geom_line(aes(y=N4exp),linetype=2,colour = "blue",size=1.1) +
+  geom_line(aes(y=N4_lo),linetype=3,colour = "blue",size=1.1) +
+  geom_line(aes(y=N4_hi),linetype=3,colour = "blue",size=1.1) +  
+  scale_x_continuous(breaks = seq(Year1-1,YearT,by=5)) +
+  scale_y_continuous(breaks = seq(1000000,9000000,by=1000000)) +
+  ggtitle("Model estimated abundance compared to 2014 (blue) deterministic model estimates") + theme_bw() 
 print(pl1b)
 #
 # Pup counts ----------------------------------------------------------------
-dp2 = data.frame(Year=Year,Pexp=sumstats[startsWith(vns,"PredPup[")==T,1],
+dp2 = data.frame(Year=Year,Pexp = sumstats[startsWith(vns,"PredPup[")==T,1],
                  P_lo = sumstats[startsWith(vns,"PredPup[")==T,4],
                  P_hi = sumstats[startsWith(vns,"PredPup[")==T,8])
 dp2$Obs = numeric(length = nrow(dp2))
@@ -54,7 +70,9 @@ pl2 = ggplot(data=dp2,aes(x=Year,y=Pexp)) +
   geom_ribbon(aes(ymin=P_lo,ymax=P_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Pup counts (total)") +
   geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-1.96*ObsSE, ymax = Obs+1.96*ObsSE)) +
-  ggtitle("Model estimated vs observed pup counts") + theme_classic()
+  scale_x_continuous(breaks = seq(Year1-1,YearT,by=5)) +
+  scale_y_continuous(breaks = seq(0,2100000,by=100000)) +  
+  ggtitle("Model estimated vs observed pup counts")  + theme_bw()
 print(pl2)
 #
 # Preg rate by age----------------------------------------------------------
@@ -118,6 +136,7 @@ pl4 = ggplot(data=dp4,aes(x=Year,y=PRexp)) +
   geom_point(aes(y=Obs)) + geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
                                             ymax = Obs+1.96*ObsSE),
                                             color="darkgrey") +
+  scale_x_continuous(breaks = seq(Year1-1,YearT,by=5)) +
   ggtitle("Model estimated vs observed pregnancy rate over time") +
   theme_classic()
 print(pl4)
@@ -151,6 +170,33 @@ pl5 = ggplot(data=dp5,aes(x=Year,y=HVexp,group=Group,color = Group, fill=Group))
   theme_classic()
 print(pl5)
 #
+# Early pup mortality -------------------------------------------------------------
+dp10 = data.frame(Year=Yearp[-length(Yearp)],nphaz=sumstats[startsWith(vns,"nphz[")==T,1],
+                  nphaz_lo = sumstats[startsWith(vns,"nphz[")==T,5],
+                  nphaz_hi = sumstats[startsWith(vns,"nphz[")==T,7])
+dp10$npM = .1/2 - (inv.logit(dp10$nphaz)*0.1) 
+dp10$npM_lo = .1/2 - (inv.logit(dp10$nphaz_lo)*0.1)   
+dp10$npM_hi = .1/2 - (inv.logit(dp10$nphaz_hi)*0.1) 
+pl10 = ggplot(data=dp10,aes(x=Year,y=npM)) +
+  geom_ribbon(aes(ymin=npM_lo,ymax=npM_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Estimated early pup mortality") +
+  ggtitle("Stoachastic variation in early pup mortality") + theme_bw()
+print(pl10)
+
+# Fecundity stochasticity -------------------------------------------------------------
+b0 = sumstats[which(vns=="b0"),1]
+dp11 = data.frame(Year=Yearp[-length(Yearp)],epsF=sumstats[startsWith(vns,"epsF[")==T,1],
+                  epsF_lo = sumstats[startsWith(vns,"epsF[")==T,4],
+                  epsF_hi = sumstats[startsWith(vns,"epsF[")==T,8])
+dp11$Fdev = inv.logit(b0 + dp11$epsF) - inv.logit(b0)
+dp11$Fdev_lo = inv.logit(b0 + dp11$epsF_lo) - inv.logit(b0)
+dp11$Fdev_hi = inv.logit(b0 + dp11$epsF_hi) - inv.logit(b0)
+pl11 = ggplot(data=dp11,aes(x=Year,y=Fdev)) +
+  geom_ribbon(aes(ymin=Fdev_lo,ymax=Fdev_hi),alpha=0.3) +
+  geom_line() + labs(x = "Year",y="Deviation from expected F (8+)") +
+  ggtitle("Stoachastic variation in fecundity") + theme_bw()
+print(pl11)
+#
 # Ice anomaly effect on pup survival---------------------------------------
 psi1mn = sumstats[startsWith(vns,"psi1")==T,1]  
 psi1sd = sumstats[startsWith(vns,"psi1")==T,3]  
@@ -161,17 +207,18 @@ plIce = Ice_mort_plot(psi1mn,psi1sd,ps2mn,ps2sd)
 print(plIce)
 #
 # Fecundity vs density ----------------------------------------------------
-NN = seq(.2,5,by=0.1)
+NN = seq(.2,7.5,by=0.1)
+lngNN = length(NN)
 iir = sample(Nsims,1000)
 b0_r = mcmc[iir,vn=="b0"]
 phiF_r = mcmc[iir,vn=="phiF"]
 thta_r = mcmc[iir,vn=="thta"]
 FC = matrix(0,nrow = 1000,ncol=length(NN))
-FC_mean = numeric(length = 40)
-FC_lo = numeric(length = 40)
-FC_hi = numeric(length = 40)
+FC_mean = numeric(length = lngNN)
+FC_lo = numeric(length = lngNN)
+FC_hi = numeric(length = lngNN)
 for(r in 1:1000){
-  FC[r,] = inv.logit(b0_r[r] - phiF_r[r]*NN^thta_r[r])
+  FC[r,] = inv.logit(b0_r[r] - (phiF_r[r]*NN)^thta_r[r])
 }
 FC_mean = colMeans(FC)
 FC_lo = apply(FC, 2, quantile, prob=0.055)

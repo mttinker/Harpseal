@@ -8,11 +8,11 @@ Year1 = 1951   #  Year1 = first year that harvest data available
 YearT = 2020   #  YearT = year AFTER last available data for fitting
 Nareas = 3     # Number pupping areas (assume 3: S.GSL, N.GSL, Front)  
 # Prior for Initial Population size year 1 (model uses weak prior):
-N0pri = 1500000 # prior guess of starting pop size, default ~ 2 million
+N0pri = 1800000 # prior guess of starting pop size, default ~ 2 million
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
 # Priors for demographic params
-Adl_Sx = 0.95    # Adult base survival (no harvest), low density (N~ 1 million)
+Adl_Sx = 0.97    # Adult base survival (no harvest), low density (N~ 1 million)
 Juv_Sx = 0.85    # Juvenile base survival (no harvest), low density (N~ 1 million)
 b0 = 2.5        # prior for logit of max adult pregancy rate (2.5 --> Fx=0.92)
 # Ice anomaly effects on pup survival:
@@ -90,8 +90,8 @@ ft = fitdist(NPA[PAtag==1,2],"beta")
 PApri[2,1] = as.numeric(ft$estimate[1]); PApri[2,2] = as.numeric(ft$estimate[2]); 
 IC = matrix(0,nrow = Nyrs, ncol = 3)
 CE = numeric(length = Nyrs)
-HVp = numeric(length = Nyrs)
-HVa = numeric(length = Nyrs)
+HVp = numeric(length = (Nyrs-1))
+HVa = numeric(length = (Nyrs-1))
 for (y in 1:Nyrs){
   ii = which(df.Ice$Year==Yr0+y)
   if(length(ii)==1){
@@ -104,7 +104,7 @@ for (y in 1:Nyrs){
     CE[y] = log(df.CE$CEindex[ii])
   }
   ii = which(df.HV$YEAR==Yr0+y)
-  if(length(ii)==1){
+  if(length(ii)==1 & y<Nyrs){
     HVp[y] = df.HV$PUPTOT[ii]
     HVa[y] = df.HV$ADLTOT[ii]
   }
@@ -112,14 +112,14 @@ for (y in 1:Nyrs){
 #
 # Calculate adult and juvenile base log hazards at low densities, 
 #  based on user-provided annual survival rate estimates
-thta = 2.3
+thta = 2.35
 gmvals = seq(2,7,by=0.01)
-SAvals = exp(-1*(exp(gamm0 + gmvals + (.033*.22*1)^thta) + exp(gamm0)))
-SJvals = exp(-1*(exp(gamm0 + gmvals + (.22*1)^thta) + exp(gamm0) + exp(gamm0+1)))
+SAvals = exp(-1*(exp(gamm0 + gmvals + (.033*.2*1)^thta) + exp(gamm0)))
+SJvals = exp(-1*(exp(gamm0 + gmvals + (.2*1)^thta) + exp(gamm0) + exp(gamm0+1)))
 Adloghz = gmvals[which(abs(SAvals-Adl_Sx)==min(abs(SAvals-Adl_Sx)))]
-Jvloghz = gmvals[which(abs(SJvals-Juv_Sx)==min(abs(SJvals-Juv_Sx)))]
+Jvloghz = gmvals[which(abs(SJvals-Juv_Sx)==min(abs(SJvals-Juv_Sx)))] 
 # scaled DD effects (relative to juv) for 1st 8 adult age classes:
-DDadlt = c(.25,.1,0,0,0,0,0,0) 
+DDadlt = 0.1
 b0pri = b0
 rm(i,ii,y,aa,ft) 
 #
@@ -134,8 +134,8 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NFages=NFages,NFage1=NFage1,
                   Nprg=Nprg,YrPct=YrPct,PAtag=PAtag,YrAGsmp=YrAGsmp,
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,DDadlt=DDadlt,psipri1a=psipri1a,
                   psipri1b=psipri1b,psipri2a=psipri2a,psipri2b=psipri2b,
-                  psi1=psi1,psi2=psi2,Adloghz=Adloghz,Jvloghz=Jvloghz,
-                  CV_HV=CV_HV,gamm0=gamm0,PApri=PApri,N0pri=N0pri) 
+                  psi1=psi1,psi2=psi2,gammA=Adloghz,gammJ=Jvloghz,
+                  CV_HV=CV_HV,gamm0=gamm0,PApri=PApri,N0pri=N0pri) #  
 #
 init_fun <- function() {list(sigF=runif(1, .8, 1),
                              sigH=runif(1, .8, 1),
@@ -148,7 +148,8 @@ init_fun <- function() {list(sigF=runif(1, .8, 1),
                              dlta=runif(1, .02, .05),
                              gammHp_mn=runif(1, 5.7, 6),
                              gammHa_mn=runif(1, 3, 3.5),
-                             thta = runif(1, 1.5, 2.4)
+                             thta = runif(1, 1.7, 2.4),
+                             N0 = runif(1, 1000000, 2000000)
                              )}
 #
 # For testing inits-----------------------------------------------------
@@ -159,13 +160,13 @@ init_fun <- function() {list(sigF=runif(1, .8, 1),
 params <- c("sigF","sigH","phiJ","phiF","b0","b1","N0","thta",
             "dlta","psi1","psi2","gammHp_mn","gammHa_mn","N",
             "PredPup","gammHp","gammHa","HVp_pred","HVa_pred",
-            "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","epsF","nphz",
-            "log_lik","Tstat1","Tstat_new1","ppp1",
+            "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","epsF",
+            "nphz","log_lik","Tstat1","Tstat_new1","ppp1",
             "Tstat2","Tstat_new2","ppp2",
             "Tstat","Tstat_new","ppp") # 
 #
 nsamples <- 500
-nburnin <- 500
+nburnin <- 1000
 cores = detectCores()
 ncore = min(20,cores-1)
 

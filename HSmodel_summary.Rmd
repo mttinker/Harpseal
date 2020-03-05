@@ -199,17 +199,18 @@ print(plF1)
 ```
 
 ```{r Fig2, echo=FALSE, warning=FALSE}
-NN = seq(.2,5,by=0.1)
+NN = seq(.2,7.5,by=0.1)
+lngNN = length(NN)
 iir = sample(Nsims,1000)
 b0_r = mcmc[iir,vn=="b0"]
 phiF_r = mcmc[iir,vn=="phiF"]
 thta_r = mcmc[iir,vn=="thta"]
 FC = matrix(0,nrow = 1000,ncol=length(NN))
-FC_mean = numeric(length = 40)
-FC_lo = numeric(length = 40)
-FC_hi = numeric(length = 40)
+FC_mean = numeric(length = lngNN)
+FC_lo = numeric(length = lngNN)
+FC_hi = numeric(length = lngNN)
 for(r in 1:1000){
-  FC[r,] = inv.logit(b0_r[r] - phiF_r[r]*NN^thta_r[r])
+  FC[r,] = inv.logit(b0_r[r] - (phiF_r[r]*NN)^thta_r[r])
 }
 FC_mean = colMeans(FC)
 FC_lo = apply(FC, 2, quantile, prob=0.055)

@@ -158,7 +158,7 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
       SJ[i] = exp(-1 * (haz_J + haz_I + haz_HVp)) 
       #  Adult competing hazards and net realized survival
       for (a in 1:Nages){
-        haz_A[a] = exp(gamm0 + gammA + (DDadlt[a]*phiJ*Nml[i])^thta) 
+        haz_A[a] = exp(gamm0 + gammA + (DDadlt[1]*phiJ*Nml[i])^thta) 
       }
       haz_HVa = exp(gamm0 + gammHa[i]) 
       S[,i] = exp(-1 * (haz_A + haz_HVa))     
