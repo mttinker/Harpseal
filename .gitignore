@@ -1,9 +1,13 @@
 Results/
 Oldcode/
 HSmodel.Rproj
-.Rhistory
-HSmodfit.rds
-.Rproj.user
 Results.rdata
 TAC_K_est.rdata
+HSmodfit.rds
 HSmodel_summary.html
+HSmodel_summary.Rmd
+.Rhistory
+.Rproj.user
+*.rdata
+*.rds
+*.html
