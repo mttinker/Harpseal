@@ -1,4 +1,4 @@
-HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
+HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
   # Function to evaluate harp seal model by simulations
   #
   # Create function to save multiple results from parallel processes
@@ -20,21 +20,21 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
     class(me) <- append(class(me),"multiResultClass")
     return(me)
   }
-  # SOme default values that may get overwritten by input files:
-  futuresim = 0 # (note: if this is a "futer sim", loaded data will update this)
-  thta = 2 # (NOTE if thta provided as fixed user input, it will replace this)
-  PAmeans = c(.18,.07,.75)
-  reps=100
+  set.seed(123)
+  # TO DELETE: Some default values that may get overwritten by input files:
+  #  futuresim = 0 # (note: if this is a "future sim", loaded data will update this)
+  #  thta = 2 # (NOTE if thta provided as fixed user input, it will replace this)
+  #  PAmeans = c(.18,.07,.75)
+  #  reps=100
+  #
   # Extract variables from input data list"
-  for(i in 1:length(stan.data)){
+  for(i in 1:length(sim.data)){
     ##first extract the object value
-    tempobj=stan.data[[i]]
+    tempobj=sim.data[[i]]
     ##now create a new variable with the original name of the list item
-    eval(parse(text=paste(names(stan.data)[[i]],"= tempobj")))
+    eval(parse(text=paste(names(sim.data)[[i]],"= tempobj")))
   }
   # Process variables and set up arrays for simulations
-  gammA = Adloghz
-  gammJ = Jvloghz   
   if(nrow(IC)==1000){
     ICr = IC
     CEr = CE    
@@ -42,10 +42,8 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
   if (futuresim==2){
     # random multipliers for harvest hazards,
     # used to increase range of values considered
-    set.seed(123)
-    ig1 = runif(reps,.5,1.5)
-    set.seed(321)
-    ig2 = runif(reps,.8,1.5)
+    ig1 = runif(reps,.3,1.5)
+    ig2 = runif(reps,.05,1.2)
   }
   iy = c(rep(1,20),seq(2,Nyrs-1))
   iz = numeric(length = length(iy)); iz[1:19] = 1
@@ -54,19 +52,21 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
   P_Predict = array(dim=c(Nyrs-1,1))
   PrPredict = array(dim=c(Nyrs-1,1))
   PrAgPred = array(dim=c(Nages,1))  
-  Agepredict1 = array(dim=c(NFages,1))
-  Agepredict2 = array(dim=c(NFages,1))
-  HVp_predict = array(dim=c(Nyrs-1,1))
-  HVa_predict = array(dim=c(Nyrs-1,1))
+  Agepredict1 = array(dim=c(NCages,1))
+  Agepredict2 = array(dim=c(NCages,1))
+  HV0_predict = array(dim=c(Nyrs-1,1))
+  HVA_predict = array(dim=c(Nyrs-1,1))
   sadmean = array(dim = c(Nages,1))
   #
   # Loop through random iterations of model
   #  using Parallel processing to speed things up
   set.seed(123)
   simresults = foreach(r=1:reps) %dorng% {
-    sumstats = sumstats1
-    vns=vns1
-    pars = init_fun()
+    mcmc = mcmc1
+    vn=vn1
+    rr = r_vec[r]
+    # Extract parameters from joint posterior
+    pars = init_fun(rr)
     for(i in 1:length(pars)){
       ##first extract the object value
       tempobj=pars[[i]]
@@ -82,42 +82,32 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
     Nml = numeric(length = Nyrs)
     n = array(dim = c(Nages,Nyrs))
     Fc = array(dim = c(Nages,Nyrs-1))
-    Sice = array(dim = c(Nareas,Nyrs-1))
-    SJ = numeric(length = Nyrs-1)
-    S = array(dim = c(Nages,Nyrs-1))
-    HVp_pred = numeric(length = Nyrs-1)
-    HVa_pred = numeric(length = Nyrs-1)
-    FmAgeVec = array(dim = c(NFages,Nyrs-1))
+    S0 = numeric(length = Nyrs-1)
+    SA = array(dim = c(Nages,Nyrs-1))
+    HV0_pred = numeric(length = Nyrs-1)
+    HVA_pred = numeric(length = Nyrs-1)
+    FmAgeVec = array(dim = c(NCages,Nyrs-1))
     PredPup = numeric(length = Nyrs-1)
     PredPupA = array(dim = c(Nareas,Nyrs-1))
-    # Params, Random assignments
     epsF = rnorm(Nyrs-1,0,sigF)
-    # epsJ = rnorm(Nyrs-1,0,sigJ)
+    epsS = rnorm(Nyrs-1,0,sigS)    
     # Harvest mort: depends on type of scenario
     if(futuresim==0){
+      # Increased stochasticity to mimic effects of autocorrelation
+      epsF = rnorm(Nyrs-1,0,1.5*sigF) + .3
+      epsS = rnorm(Nyrs-1,0,1.5*sigS) - .3   
       # Level of harvest as observed
-      gammHp = rnorm(Nyrs-1,gammHp_mn,sigH)
-      gammHa = rnorm(Nyrs-1,gammHa_mn,sigH)
-      # Add some of the "observed" harvest patterns of major deviations
-      gammHp[1:4] = gammHp[1:4]*1.1
-      gammHp[5:21] = gammHp[5:21]*1.15
-      gammHp[33:45] = gammHp[33:45]*0.8
-      gammHp[46:58] = gammHp[46:58]*1
-      gammHp[59:69] = gammHp[59:69]*0.8
-      gammHa[1:4] = gammHa[1:4]*1.1
-      gammHa[5:21] = gammHa[5:21]*1.15
-      gammHa[33:45] = gammHa[33:45]*0.8
-      gammHa[46:58] = gammHa[46:58]*1
-      gammHa[59:69] = gammHa[59:69]*0.8
+      gamma_H0 = gamma_H0
+      gamma_HA = gamma_HA
     }else if(futuresim==1){
       # No harvest hazards (for estimating K)
-      gammHp = rep(0,Nyrs-1)
-      gammHa = rep(0,Nyrs-1)
+      gamma_H0 = rep(0,Nyrs-1)
+      gamma_HA = rep(0,Nyrs-1)
     }else if(futuresim==2){
       # Range of harvest levels, for finding TAC criteria
       # (then harvest rate remains constant for years within a sim)
-      gammHp = rep(gammHp_mn*ig1[r],Nyrs-1)
-      gammHa = rep(gammHa_mn*ig2[r],Nyrs-1)
+      gamma_H0 = rep(gamma_H0_mn*ig1[r],Nyrs-1)
+      gamma_HA = rep(gamma_HA_mn*ig2[r],Nyrs-1)
     }
     PA = array(dim=c(3,Nyrs-1))
     for(i in 1:(Nyrs-1)){
@@ -133,50 +123,55 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
         n[,i] = sad0 * N[i]
       }
       #  Declare some temporary variables for this year:
-      haz_J = numeric()
+      haz_0 = numeric()
       haz_A = numeric(length = Nages)
-      gammIce = numeric(length = Nareas)
+      gamma_I = numeric(length = Nareas)
       haz_I_A = numeric(length = Nareas)
       haz_I = numeric()
-      haz_HVp = numeric()
-      haz_HVa = numeric()
-      prp_HV_p = numeric()
-      prp_HV_a = numeric(length = Nages)
+      haz_H0 = numeric()
+      haz_HA = numeric()
+      prp_HV_0 = numeric()
+      prp_HV_A = numeric(length = Nages)
       nt1 = numeric(length = Nages)
       #  Fecundity (compared with observed pregnancy rate: adjust for abortions?)
-      Fc[1:2,i] = rep(0,2) 
-      Fc[3:Nages,i] = gtools::inv.logit(b0 - b1 * (Nages-ages[3:Nages])^2 - (phiF*Nml[i])^thta + dlta*CE[i]*(Nml[i]) + epsF[i])
+      Fc[1:3,i] = rep(0,3) 
+      Fc[4:8,i] = gtools::inv.logit(beta1 - beta2 * (8-ages[4:8])^2 - (phiF*Nml[i])^thtaF + dlta*CE[i]*(Nml[i]) + epsF[i])
+      Fc[9:Nages,i] = rep(Fc[8,i],(Nages-8)) 
       #  Juvenile competing hazards and net realized survival
-      haz_J = exp(gamm0 + gammJ + (phiJ*Nml[i])^thta) ; #  + epsJ[i]
+      haz_0 = exp(omega + gamma_0 + (phiS*Nml[i])^thtaS + epsS[i]) ; #  + epsJ[i]
       for(a in 1:Nareas){ 
-        gammIce[a] = psi1 * (1/exp(IC[i,a]))^psi2 - 1 
-        Sice[a,i] = exp(-1 * exp(gamm0 + gammIce[a])) 
-        haz_I_A[a] = exp(gamm0 + gammIce[a]) 
+        gamma_I[a] = 8 * exp(psi1 - (IC[i,a] * psi2)) / (1 + exp(psi1 - (IC[i,a] * psi2))) 
+        haz_I_A[a] = exp(omega + gamma_I[a]) 
       } 
       haz_I = sum(PA[,i] * haz_I_A)
-      haz_HVp = exp(gamm0 + gammHp[i]) 
-      SJ[i] = exp(-1 * (haz_J + haz_I + haz_HVp)) 
+      haz_H0 = exp(omega + gamma_H0[i]) 
+      S0[i] = exp(-1 * (haz_0 + haz_I + haz_H0)) 
       #  Adult competing hazards and net realized survival
-      for (a in 1:Nages){
-        haz_A[a] = exp(gamm0 + gammA + (DDadlt[1]*phiJ*Nml[i])^thta) 
-      }
-      haz_HVa = exp(gamm0 + gammHa[i]) 
-      S[,i] = exp(-1 * (haz_A + haz_HVa))     
+      haz_A = exp(omega + gamma_A + zeta*((phiS*Nml[i])^thtaS)*(1/ages) )
+      haz_HA = exp(omega + gamma_HA[i]) 
+      SA[,i] = exp(-1 * (haz_A + haz_HA))     
       #  Calculations for proportional mortality from harvest
-      prp_HV_p = haz_HVp / (haz_J + haz_I + haz_HVp) 
-      HVp_pred[i] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (1 - SJ[i]) * prp_HV_p 
+      # NOTE: ACCOUNT FOR SNL FOR TAC CALCS? (futuresim2)
+      prp_HV_0 = haz_H0 / (haz_0 + haz_I + haz_H0) 
+      HV0_pred[i] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (1 - S0[i]) * prp_HV_0 
+      if (futuresim==0){
+        HV0_pred[i] =  HV0_pred[i] -0.1*HV0_pred[i]
+      }      
       if (futuresim==2){
-        HVp_pred[i] = HVp_pred[i] - (Grn_P+Arc_P+Byc_P)
+        HV0_pred[i] = HV0_pred[i] - (Grn_P+Arc_P+Byc_P)
       }
-      prp_HV_a = haz_HVa / (haz_A + haz_HVa) 
-      HVa_pred[i] = sum((n[,i] * (1 - S[,i])) * prp_HV_a) 
+      prp_HV_A = haz_HA / (haz_A + haz_HA) 
+      HVA_pred[i] = sum((n[,i] * (1 - SA[,i])) * prp_HV_A) 
+      if (futuresim==0){
+        HVA_pred[i] =  HVA_pred[i] -0.5*HVA_pred[i]
+      }
       if (futuresim==2){
-        HVa_pred[i] = HVa_pred[i] - (Grn_A+Arc_A+Byc_A)
+        HVA_pred[i] = HVA_pred[i] - (Grn_A+Arc_A+Byc_A)
       }    
       #  Annual demographic transitions
-      nt1[1] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (SJ[i])
-      nt1[2:(Nages-1)] = n[1:(Nages-2),i] * S[1:(Nages-2),i]
-      nt1[Nages] = n[Nages-1,i] * S[Nages-1,i] + n[Nages,i] * S[Nages,i] ;    
+      nt1[1] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (S0[i])
+      nt1[2:(Nages-1)] = n[1:(Nages-2),i] * SA[1:(Nages-2),i]
+      nt1[Nages] = n[Nages-1,i] * SA[Nages-1,i] + n[Nages,i] * SA[Nages,i] ;    
       if (iz[ix] == 1){
         sad0 = nt1/sum(nt1)
       }else{
@@ -184,7 +179,7 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
         N[i+1] = sum(n[,i+1]) ;
         Nml[i+1] = N[i+1]/1000000 ;    
         #  Female predicted age vector (ages 3 - 8+), for year i
-        FmAgeVec[,i] = n[NFage1:Nages,i] / (0.00001 + sum( n[NFage1:Nages,i])) ;
+        FmAgeVec[,i] = n[NCage1:Nages,i] / (0.00001 + sum( n[NCage1:Nages,i])) ;
         #  Predicted Pups to be surveyed (allowing for early ice mortality), 
         #    by area and total, for year i 
         for (a in 1:Nareas){
@@ -196,17 +191,17 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
     N_Predict[,1] = N  
     P_Predict[,1] = PredPup  
     PrPredict[,1] = Fc[8,]
-    PrAgPred[,1] = Fc[1:8,1]
-    # Age dist for sample years 17 = 1967, 69 = 2019
+    PrAgPred[,1] = Fc[1:Nages,1]
+    # Age dist for sample years 25 = 1975, 69 = 2019
     if(futuresim==0 & Nyrs>69){
-      Agepredict1[,1] = FmAgeVec[,17]
+      Agepredict1[,1] = FmAgeVec[,25]
       Agepredict2[,1] = FmAgeVec[,69]    
     }else{
       Agepredict1[,1] = FmAgeVec[,1]
       Agepredict2[,1] = FmAgeVec[,Nyrs-1]     
     }
-    HVp_predict[,1] = HVp_pred
-    HVa_predict[,1] = HVa_pred
+    HV0_predict[,1] = HV0_pred
+    HVA_predict[,1] = HVA_pred
     sadmean[,1] = sad0
     result <- multiResultClass()
     result$result1 <- N_Predict
@@ -215,8 +210,8 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
     result$result4 <- PrAgPred
     result$result5 <- Agepredict1
     result$result6 <- Agepredict2
-    result$result7 <- HVp_predict
-    result$result8 <- HVa_predict
+    result$result7 <- HV0_predict
+    result$result8 <- HVA_predict
     result$result9 <- sadmean
     return(result)
   }
@@ -225,10 +220,10 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
   P_Predict = array(dim=c(Nyrs-1,reps))  
   PrPredict = array(dim=c(Nyrs-1,reps))
   PrAgPred = array(dim=c(Nages,reps))
-  Agepredict1 = array(dim=c(NFages,reps))
-  Agepredict2 = array(dim=c(NFages,reps))
-  HVp_predict = array(dim=c(Nyrs-1,reps))
-  HVa_predict = array(dim=c(Nyrs-1,reps))
+  Agepredict1 = array(dim=c(NCages,reps))
+  Agepredict2 = array(dim=c(NCages,reps))
+  HV0_predict = array(dim=c(Nyrs-1,reps))
+  HVA_predict = array(dim=c(Nyrs-1,reps))
   sadmean = array(dim = c(Nages,reps))
   for(r in 1:reps){
     N_Predict[,r] = simresults[[r]]$result1[,1]
@@ -237,13 +232,13 @@ HSmod_sim <- function(init_fun,stan.data,sumstats1,vns1) {
     PrAgPred[,r] = simresults[[r]]$result4[,1]
     Agepredict1[,r] = simresults[[r]]$result5[,1]  
     Agepredict2[,r] = simresults[[r]]$result6[,1] 
-    HVp_predict[,r] = simresults[[r]]$result7[,1]
-    HVa_predict[,r] = simresults[[r]]$result8[,1]  
+    HV0_predict[,r] = simresults[[r]]$result7[,1]
+    HVA_predict[,r] = simresults[[r]]$result8[,1]  
     sadmean[,r] = simresults[[r]]$result9[,1]   
   }
   sadmn = rowMeans(sadmean)
   results = list(N_Predict=N_Predict,P_Predict=P_Predict,PrPredict=PrPredict,
                  PrAgPred=PrAgPred,Agepredict1=Agepredict1,Agepredict2=Agepredict2,
-                 HVp_predict=HVp_predict,HVa_predict=HVa_predict,SAD=sadmn)
+                 HV0_predict=HV0_predict,HVA_predict=HVA_predict,SAD=sadmn)
   return(results)  
 }
