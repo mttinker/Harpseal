@@ -1,4 +1,4 @@
-# Shell script for fitting harp seal model
+# Shell script for fitting harp seal model, Cmdstan version
 #   NOTE: 3 pupping areas: 1) S.GSL, 2) N.GSL, 3) Front
 #       - for ice mortality, allow some pup deaths to occur before counts?
 #
@@ -164,7 +164,7 @@ init_fun <- function() {list(sigF=runif(1, .5, .8),
                              alpha1 = runif(1, .05, .1),
                              alpha2 = runif(1, .005, .01),
                              nu = runif(1, .2, .3)
-                             )}
+)}
 #
 params <- c("sigF","sigH","sigS","tau","phi","thta","beta1","beta2",
             "N0","alpha0","alpha1","alpha2","nu","zeta","dlta",
@@ -179,51 +179,34 @@ ncore = min(20,cores-1)
 #
 # Run STAN to fit model---------------------------------------------
 #
-require(rstan)
-# Set options for STAN
-options(mc.cores = parallel::detectCores())
-rstan_options(auto_write = TRUE)
+library(cmdstanr)
+library(posterior)
 #
-niter <- round(nsamples/ncore) + nburnin
+Niter = round(nsamples/ncore)
 #
-out <- stan(
-  file = fitmodel,         # Stan program
-  data = stan.data,        # named list of data
-  pars = params,           # list of params to monitor
-  init= init_fun,          # initial values    "random"            
-  chains = ncore,          # number of Markov chains
-  warmup = nburnin,        # number of warmup iterations per chain
-  iter = niter,            # total number of iterations per chain
-  cores = ncore,           # number of available cores 
-  refresh = 100,           # show progress every 'refresh' iterations
-  # increase adapt_delta and max_treedepth to help find optimal vals
-  control = list(adapt_delta = 0.9, max_treedepth = 12) 
+mod <- cmdstan_model(fitmodel)
+#
+suppressMessages(
+  suppressWarnings ( 
+    fit <- mod$sample(
+      data = stan.data,
+      init = init_fun,
+      seed = 123,
+      chains = ncore,
+      parallel_chains = ncore,
+      refresh = 100,
+      iter_warmup = nburnin,
+      iter_sampling = Niter
+    )
+  )
 )
-#
 # generate summary stats (sumstats, mcmc matrix)
-#
-mcmc <- as.matrix(out)
-vn = colnames(mcmc)
-Nsims = nrow(mcmc)
-sumstats = summary(out)$summary
-vns = row.names(sumstats)
+source("cmdstan_sumstats.r")
 #
 # Some traceplots to inspect results
-traceplot(out, pars=c("sigF","sigS","sigH"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("beta1"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("beta2"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("alpha0"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("alpha1"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("alpha2"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("phi"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("thta"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("zeta"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("gamma_H0_mn"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("gamma_HA_mn"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("dlta"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("psi1","psi2"), inc_warmup = F, nrow = 2)
+mcmc_trace(fit$draws(c("sigF","sigF","sigH")))
 #
-rm(out)
+rm(fit,mod)
 #
 # Save results --------------------------------------------------------------
 #
