@@ -9,7 +9,7 @@ Year1 = 1951   #  Year1 = first year that harvest data available
 YearT = 2020   #  YearT = year AFTER last available data for fitting
 Nareas = 3     # Number pupping areas (assume 3: S.GSL, N.GSL, Front)  
 # Prior for Initial Population size year 1 (model uses weak prior):
-N0pri = 2400000 # prior guess of starting pop size, default ~ 2.2 million
+N0pri = 2.4  # prior guess of starting pop size, in millions
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
 # Youngest adult age class to consider for age composition fitting
@@ -21,8 +21,8 @@ psi2 = 5       # prior for psi param2 of ice anomaly effect fxn
 psi1_sd = 1    # stddev of psi1 prior mean (determines strength of prior)
 psi2_sd = 1    # stddev of psi2 prior mean (determines strength of prior)
 #
-nburnin = 1000
-nsamples = 10000
+nburnin = 700
+nsamples = 6000
 #
 # End user params -----------------------------------------------------------
 #
@@ -132,8 +132,6 @@ for (i in 1:(3*Nyrs)){
 rm(i,ii,y,aa,ft) 
 #
 # Set up Jags inputs --------------------------------------------------------
-#
-fitmodel = c("HSmodfit.stan")
 #  
 stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NCages=NCages,NCage1=NCage1,NPActs=NPActs,
                   NCobs=NCobs,NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
@@ -148,7 +146,7 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NCages=NCages,NCage1=NCage1,NPActs=N
 init_fun <- function() {list(sigF=runif(1, .5, .8),
                              sigH=runif(1, .5, 1),
                              sigS=runif(1, 1, 2),
-                             tau=runif(1, 8, 12),
+                             tau=runif(1, 5, 10),
                              phi=runif(2, .1, .5),
                              zeta=runif(1, .1, .2),
                              beta1=runif(1, 2.5-.25, 2.5+.25),
@@ -156,10 +154,10 @@ init_fun <- function() {list(sigF=runif(1, .5, .8),
                              psi1=runif(1, psipri1a-.25, psipri1a+.25),
                              psi2=runif(1, psipri2a-.25, psipri2a+.25),
                              dlta=runif(1, .05, .1),
-                             gamma_H0_mn=runif(1, 5.8, 6.2),
-                             gamma_HA_mn=runif(1, 3.5, 4),
+                             gamma_H0_mn=runif(1, 5.5, 6),
+                             gamma_HA_mn=runif(1, 3, 3.5),
                              thta = runif(2, 1, 2),
-                             N0 = runif(1, N0pri*.95, N0pri*1.05),
+                             N0mil = runif(1, N0pri*.95, N0pri*1.05),
                              alpha0 = runif(1, 2.5, 3),
                              alpha1 = runif(1, .05, .1),
                              alpha2 = runif(1, .005, .01),
@@ -177,6 +175,8 @@ params <- c("sigF","sigH","sigS","tau","phi","thta","beta1","beta2",
 cores = detectCores()
 ncore = min(20,cores-1)
 #
+fitmodel = c("HSmodfit.stan")
+#
 # Run STAN to fit model---------------------------------------------
 #
 library(cmdstanr)
@@ -191,12 +191,14 @@ suppressMessages(
     fit <- mod$sample(
       data = stan.data,
       init = init_fun,
-      seed = 123,
+      seed = 234,
       chains = ncore,
       parallel_chains = ncore,
       refresh = 100,
       iter_warmup = nburnin,
-      iter_sampling = Niter
+      iter_sampling = Niter,
+      max_treedepth = 12,
+      adapt_delta = 0.9
     )
   )
 )
@@ -204,7 +206,7 @@ suppressMessages(
 source("cmdstan_sumstats.r")
 #
 # Some traceplots to inspect results
-mcmc_trace(fit$draws(c("sigF","sigF","sigH")))
+draws = fit$draws(variables = "alpha1"); mcmc_trace(draws)
 #
 rm(fit,mod)
 #

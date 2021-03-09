@@ -46,17 +46,17 @@ data {
 }
 // Section 2. The parameters to be estimated 
 parameters {
-  real<lower=0> alpha0 ;          // base adult log haz (for 10 yr old)
-  real<lower=0> alpha1 ;          // adult log haz age modifier par 1
-  real<lower=0> alpha2 ;          // adult log haz age modifier par 2
+  real<lower=0> alpha0 ;           // base adult log haz (for 10 yr old)
+  real<lower=0> alpha1 ;           // adult log haz age modifier par 1
+  real<lower=0> alpha2 ;           // adult log haz age modifier par 2
   real<lower=0> nu ;               // log haz ratio for juv relative to sub-adlt   
   simplex[NCages] pie[NCobs];      // probs of age counts (for multinomial)
   vector<lower=0,upper=0.45>[Nyrs-1] PA1 ; // proportion pups in area 1
   vector<lower=0,upper=0.45>[Nyrs-1] PA2 ; // proportion pups in area 2
-  real<lower=0,upper=4> thta[2];   // theta params: controls "shape" of DD (for Fecundity and survival)
+  real<lower=0> thta[2];           // theta params: controls "shape" of DD (for Fecundity and survival)
   real<lower=0> phi[2];            // D-D effects for fecundity (1) and survival (2)
-  real<lower=0,upper=10> beta1;    // Fecundity: Logit of max adult pregancy rate
-  real<lower=0,upper=1> beta2;     // Fecundity: age effect (reduced for younger)
+  real<lower=0> beta1;             // Fecundity: Logit of max adult pregancy rate
+  real<lower=0> beta2;            // Fecundity: age effect (reduced for younger)
   real psi1;                       // Ice anomaly effect on pup survival, fxn param 1 
   real<lower=0> psi2;              // Ice anomaly effect on pup survival, fxn param 2 
   real<lower=.001> N0mil;          // Initial Abundance, year 1 of time series (i millions)
@@ -186,24 +186,24 @@ model {
   PA1 ~ beta(PApri[1,1],PApri[1,2]) ; // Annual proportion of pups area 1
   PA2 ~ beta(PApri[2,1],PApri[2,2]) ; // Annual proportion of pups area 2
   // Base parameters:
-  N0mil ~ normal(0,2.5) ; 
-  thta ~ gamma(3,2) ;
-  phi ~ normal(0,1) ;
-  beta1 ~ normal(0,5) ;
-  beta2 ~ normal(0,.5) ;
+  N0mil ~ normal(0,2.5) ;
+  thta ~ normal(1,1) ;
+  phi ~ cauchy(0,2.5) ;
+  beta1 ~ cauchy(0,2.5) ;
+  beta2 ~ cauchy(0,2.5) ;
   psi1 ~ normal(psipri1a,psipri1b) ;
   psi2 ~ normal(psipri2a,psipri2b) ;
-  dlta ~ normal(0,.25) ;
-  sigF ~ normal(0,2.5) ;
-  sigH ~ normal(0,2.5) ;
-  sigS ~ normal(0,2.5) ;
-  tau ~ normal(0,15) ;
-  gamma_H0_mn ~ normal(0,10) ;
-  gamma_HA_mn ~ normal(0,10) ;
-  alpha0 ~ normal(3,1.5) ;
-  alpha1 ~ normal(0,.25) ;
-  alpha2 ~ normal(0,.025) ;
-  nu ~ normal(0,.5) ;
+  dlta ~ cauchy(0,2.5) ;
+  sigF ~ cauchy(0,2.5) ;
+  sigH ~ cauchy(0,2.5) ;
+  sigS ~ cauchy(0,2.5) ;
+  tau ~ cauchy(0,10) ;
+  gamma_H0_mn ~ cauchy(0,2.5) ;
+  gamma_HA_mn ~ cauchy(0,2.5) ;
+  alpha0 ~ cauchy(0,2.5) ;
+  alpha1 ~ cauchy(0,2.5) ;
+  alpha2 ~ cauchy(0,2.5) ;
+  nu ~ cauchy(0,2.5) ;
   zeta ~ beta(1,5) ;
 }
 // Section 5. Derived parameters and statistics 

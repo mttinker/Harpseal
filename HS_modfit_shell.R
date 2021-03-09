@@ -9,7 +9,7 @@ Year1 = 1951   #  Year1 = first year that harvest data available
 YearT = 2020   #  YearT = year AFTER last available data for fitting
 Nareas = 3     # Number pupping areas (assume 3: S.GSL, N.GSL, Front)  
 # Prior for Initial Population size year 1 (model uses weak prior):
-N0pri = 2400000 # prior guess of starting pop size, default ~ 2.2 million
+N0pri = 2.4  # prior guess of starting pop size, in millions
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
 # Youngest adult age class to consider for age composition fitting
@@ -132,8 +132,6 @@ for (i in 1:(3*Nyrs)){
 rm(i,ii,y,aa,ft) 
 #
 # Set up Jags inputs --------------------------------------------------------
-#
-fitmodel = c("HSmodfit.stan")
 #  
 stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NCages=NCages,NCage1=NCage1,NPActs=NPActs,
                   NCobs=NCobs,NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
@@ -159,7 +157,7 @@ init_fun <- function() {list(sigF=runif(1, .5, .8),
                              gamma_H0_mn=runif(1, 5.8, 6.2),
                              gamma_HA_mn=runif(1, 3.5, 4),
                              thta = runif(2, 1, 2),
-                             N0 = runif(1, N0pri*.95, N0pri*1.05),
+                             N0mil = runif(1, N0pri*.95, N0pri*1.05),
                              alpha0 = runif(1, 2.5, 3),
                              alpha1 = runif(1, .05, .1),
                              alpha2 = runif(1, .005, .01),
@@ -176,6 +174,8 @@ params <- c("sigF","sigH","sigS","tau","phi","thta","beta1","beta2",
 #
 cores = detectCores()
 ncore = min(20,cores-1)
+#
+fitmodel = c("HSmodfit.stan")
 #
 # Run STAN to fit model---------------------------------------------
 #
