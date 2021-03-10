@@ -196,19 +196,6 @@ pl5 = ggplot(data=dp5,aes(x=Year,y=HVexp,group=Group,color = Group, fill=Group))
   theme_classic()
 print(pl5)
 #
-# Early pup mortality -------------------------------------------------------------
-dp6 = data.frame(Year=Yearp[-length(Yearp)],nphaz=sumstats[startsWith(vns,"nphz[")==T,1],
-                  nphaz_lo = sumstats[startsWith(vns,"nphz[")==T,5],
-                  nphaz_hi = sumstats[startsWith(vns,"nphz[")==T,7])
-dp6$npM = (inv.logit(dp6$nphaz)*0.1) 
-dp6$npM_lo = (inv.logit(dp6$nphaz_lo)*0.1)   
-dp6$npM_hi = (inv.logit(dp6$nphaz_hi)*0.1) 
-pl6 = ggplot(data=dp6,aes(x=Year,y=npM)) +
-  geom_ribbon(aes(ymin=npM_lo,ymax=npM_hi),alpha=0.3) +
-  geom_line() + labs(x = "Year",y="Estimated early pup mortality") +
-  ggtitle("Stoachastic variation in early pup mortality") + theme_bw()
-print(pl6)
-
 # Fecundity stochasticity -------------------------------------------------------------
 b0 = sumstats[which(vns=="beta1"),1]
 dp7 = data.frame(Year=Yearp[-length(Yearp)],epsF=sumstats[startsWith(vns,"epsF[")==T,1],
@@ -344,7 +331,7 @@ print(pl12)
 # Evaluate model sims-----------------------------------------------------
 # Simulate future data with or without harvest mort
 futuresim = 0; # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
-Nyrs2 = 100; Yearst2 = 2021 ; reps = 1500
+Nyrs2 = 100; Yearst2 = 2021 ; reps = 5000
 PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
 set.seed(123)
 r_vec = sample(nrow(mcmc),reps,replace = T)

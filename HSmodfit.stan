@@ -43,6 +43,7 @@ data {
   vector[Nyrs-1] Q_0 ;            // probability that a harvested pup is observed (and not SnL) 
   vector[Nyrs-1] Q_A;             // probability that a harvested adult is observed (and not SnL) 
   vector[41] ICvec ;              // dummy vector of ice anomaly values, -1 to 1
+  vector[Nyrs-1] Snp ;            // average newborn pup survival   
 }
 // Section 2. The parameters to be estimated 
 parameters {
@@ -67,7 +68,7 @@ parameters {
   real<lower=0> tau;               // precision param for dirichlet-multinomial age dist
   real epsF[Nyrs-1];               // Stochastic effects on fecundity, by year
   real epsS[Nyrs-1];               // Stochastic effects on juv survival, by year
-  real nphz[Nyrs-1];               // Stochastic Newborn pup hazards (e.g. abortion, abandonment)
+  // real nphz[Nyrs-1];               // Stochastic Newborn pup hazards (e.g. abortion, abandonment)
   real<lower=0> gamma_H0_mn ;      // Mean Harvest log hazard rate, Juvenile
   real<lower=0> gamma_HA_mn;       // Mean Harvest log hazard rate, Adult
   real gamma_H0[Nyrs-1];           // Annual harvest log hazard rate, Juvenile (beaters)
@@ -84,7 +85,7 @@ transformed parameters {
   vector<lower=0>[Nages] n[Nyrs] ;      // Population vector, by year
   vector<lower=0>[Nages] Fc[Nyrs-1] ;   // Fecundity vector, by year
   real<lower=0> S0[Nyrs-1] ;            // Juv Survival from all competing hazards 
-  vector<lower=0>[Nyrs-1] Snp ;          // Newborn pup survival (from abortion, abandonment) 
+  // vector<lower=0>[Nyrs-1] Snp ;          // Newborn pup survival (from abortion, abandonment) 
   vector<lower=0>[Nages] SA[Nyrs-1];     // Adult Survival from all competing hazards
   real<lower=0> Pups_pred[Nyrs-1] ;       // Predicted pups available for counting, by year  
   vector<lower=0>[Nyrs-1] H0_pred_ALL ;// predicted harvest numbers by year, pups (including SNL)
@@ -100,7 +101,7 @@ transformed parameters {
   // overwrite PA values with observed proportions for years available
   PA[PAidx] = NPA ;
   // Newborn pup survival for each year (stochastic)
-  Snp = 1 - (inv_logit(to_vector(nphz)) * 0.1) ;
+  // Snp = 1 - (inv_logit(to_vector(nphz)) * 0.1) ;
   // Initize pop vector  
   N[1] = N0 ;                     // Initialize population, year 1
   n[1] = sad0 * N[1];             // Initialize population vector, year 1
@@ -172,7 +173,7 @@ model {
     pie[i] ~ dirichlet(10 * tau * (n[YrAGsmp[i]][NCage1:Nages] / sum(n[YrAGsmp[i]][NCage1:Nages])));
     Agects[i,] ~ multinomial(pie[i]) ;
   }
-  //  Pregancy status of females by age/year (binomial dist)
+  //  Pregancy status of females by age/year (beta-binomial dist)
   for(i in 1:NPRobs){
     NPrg[i] ~ binomial(NFsamp[i], Fc[YrPRsmp[i]][AgePRsmp[i]]) ;
   }
@@ -180,13 +181,13 @@ model {
   // Hierarchical random effects: NOTE: maybe make annual stochastic effects autoregressive (AR[1])?  
   epsF ~ normal(0,sigF) ;          // Annual deviations from mean fecundity
   epsS ~ normal(0,sigS) ;          // Annual deviations from mean juv hazards
-  nphz ~ normal(0,1) ;             // Annual pre-survey newborn hazards
+  // nphz ~ normal(0,1) ;             // Annual pre-survey newborn hazards
   gamma_H0 ~ normal(gamma_H0_mn,sigH); // Annual pup harvest log hazards
   gamma_HA ~ normal(gamma_HA_mn,sigH); // Annual adult harvest log hazards
   PA1 ~ beta(PApri[1,1],PApri[1,2]) ; // Annual proportion of pups area 1
   PA2 ~ beta(PApri[2,1],PApri[2,2]) ; // Annual proportion of pups area 2
   // Base parameters:
-  N0mil ~ normal(0,2.5) ; 
+  N0mil ~ normal(2.5,1) ; 
   thta ~ gamma(3,2) ;
   phi ~ normal(0,1) ;
   beta1 ~ normal(0,5) ;
@@ -197,9 +198,9 @@ model {
   sigF ~ normal(0,2.5) ;
   sigH ~ normal(0,2.5) ;
   sigS ~ normal(0,2.5) ;
-  tau ~ normal(0,15) ;
-  gamma_H0_mn ~ normal(0,10) ;
-  gamma_HA_mn ~ normal(0,10) ;
+  tau ~ cauchy(0,5) ;
+  gamma_H0_mn ~ normal(6,1) ;
+  gamma_HA_mn ~ normal(3.5,1) ;
   alpha0 ~ normal(3,1.5) ;
   alpha1 ~ normal(0,.25) ;
   alpha2 ~ normal(0,.025) ;

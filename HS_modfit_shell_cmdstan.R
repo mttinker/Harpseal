@@ -21,7 +21,7 @@ psi2 = 5       # prior for psi param2 of ice anomaly effect fxn
 psi1_sd = 1    # stddev of psi1 prior mean (determines strength of prior)
 psi2_sd = 1    # stddev of psi2 prior mean (determines strength of prior)
 #
-nburnin = 700
+nburnin = 500
 nsamples = 6000
 #
 # End user params -----------------------------------------------------------
@@ -128,6 +128,9 @@ ICcat = matrix(0,nrow = Nyrs, ncol = 3)
 for (i in 1:(3*Nyrs)){
   ICcat[i] = which(abs(IC[i] - ICvec) == min(abs(IC[i]- ICvec)))
 }
+# Newborn pup survival (accounts for abortions and deaths prior to up survey)
+# - for current model fix this at 0.95
+Snp=rep(0.95,Nyrs-1)
 #
 rm(i,ii,y,aa,ft) 
 #
@@ -141,7 +144,7 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NCages=NCages,NCage1=NCage1,NPActs=N
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,psipri1a=psipri1a,
                   psipri1b=psipri1b,psipri2a=psipri2a,psipri2b=psipri2b,
                   omega=omega,Q_A=Q_A,Q_0=Q_0,CV_HV=CV_HV,
-                  PApri=PApri,N0pri=N0pri,ICvec=ICvec) 
+                  PApri=PApri,N0pri=N0pri,ICvec=ICvec,Snp=Snp) 
 #
 init_fun <- function() {list(sigF=runif(1, .5, .8),
                              sigH=runif(1, .5, 1),
@@ -170,7 +173,7 @@ params <- c("sigF","sigH","sigS","tau","phi","thta","beta1","beta2",
             "gamma_0","S0_ld","S0_hd","gamma_A","SA_ld","SA_hd","epsF","epsS",
             "Pups_pred","gamma_H0","gamma_HA","H0_pred","HA_pred",
             "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","haz_Ice",
-            "nphz","log_lik","y_new1","y_new2") # 
+            "log_lik","y_new1","y_new2") # 
 #
 cores = detectCores()
 ncore = min(20,cores-1)
@@ -197,8 +200,8 @@ suppressMessages(
       refresh = 100,
       iter_warmup = nburnin,
       iter_sampling = Niter,
-      max_treedepth = 12,
-      adapt_delta = 0.9
+      max_treedepth = 11,
+      adapt_delta = 0.85
     )
   )
 )
@@ -206,7 +209,9 @@ suppressMessages(
 source("cmdstan_sumstats.r")
 #
 # Some traceplots to inspect results
-draws = fit$draws(variables = "alpha1"); mcmc_trace(draws)
+draws = fit$draws(variables = "sigF"); mcmc_trace(draws)
+draws = fit$draws(variables = "sigS"); mcmc_trace(draws)
+draws = fit$draws(variables = "tau"); mcmc_trace(draws)
 #
 rm(fit,mod)
 #

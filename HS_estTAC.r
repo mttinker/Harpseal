@@ -14,7 +14,7 @@ require(dplyr)
 require(stats)
 require(betareg)
 #
-reps = 15000
+reps = 20000
 PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
 set.seed(123)
 r_vec = sample(nrow(mcmc),reps,replace = T)
@@ -202,13 +202,13 @@ newdat10ad =   tmp;
 tmp = data.frame(HvT=HvTeval50, HvT2=HvTeval50^2, ppA=rep(.5,length(HvTeval50))); tmp$intx = tmp$HvT*tmp$ppA
 newdat50ad = tmp;
 
-tmp = predict(fit3, newdata = newdat05ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
+tmp = predict(fit, newdata = newdat05ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
 pred05ad = data.frame(HvT=HvTeval05,Fitted = tmp[,2],Lower = tmp[,1],Upper=tmp[,3])
 
-tmp = predict(fit3, newdata = newdat10ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
+tmp = predict(fit, newdata = newdat10ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
 pred10ad = data.frame(HvT=HvTeval10,Fitted = tmp[,2],Lower = tmp[,1],Upper=tmp[,3])
 
-tmp = predict(fit3, newdata = newdat50ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
+tmp = predict(fit, newdata = newdat50ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
 pred50ad = data.frame(HvT=HvTeval50,Fitted = tmp[,2],Lower = tmp[,1],Upper=tmp[,3])
 
 ggplot(pred05ad,aes(x=HvT,y=Fitted)) +

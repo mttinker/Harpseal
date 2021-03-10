@@ -21,8 +21,8 @@ psi2 = 5       # prior for psi param2 of ice anomaly effect fxn
 psi1_sd = 1    # stddev of psi1 prior mean (determines strength of prior)
 psi2_sd = 1    # stddev of psi2 prior mean (determines strength of prior)
 #
-nburnin = 1000
-nsamples = 10000
+nburnin = 500
+nsamples = 6000
 #
 # End user params -----------------------------------------------------------
 #
@@ -37,8 +37,6 @@ Ice_mort_plot(psipri1a,psipri1b,psipri2a,psipri2b)
 # Load libraries-------------------------------------------------------------
 require(parallel)
 require(gtools)
-#require(lattice)
-#require(coda)
 require(ggplot2)
 require(dplyr)
 require(reshape2)
@@ -129,6 +127,10 @@ for (i in 1:(3*Nyrs)){
   ICcat[i] = which(abs(IC[i] - ICvec) == min(abs(IC[i]- ICvec)))
 }
 #
+# Newborn pup survival (accounts for abortions and deaths prior to up survey)
+# - for current model fix this at 0.95
+Snp=rep(0.95,Nyrs-1)
+#
 rm(i,ii,y,aa,ft) 
 #
 # Set up Jags inputs --------------------------------------------------------
@@ -141,7 +143,7 @@ stan.data <- list(NPcts=NPcts,NPctsA=NPctsA,NCages=NCages,NCage1=NCage1,NPActs=N
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,psipri1a=psipri1a,
                   psipri1b=psipri1b,psipri2a=psipri2a,psipri2b=psipri2b,
                   omega=omega,Q_A=Q_A,Q_0=Q_0,CV_HV=CV_HV,
-                  PApri=PApri,N0pri=N0pri,ICvec=ICvec) 
+                  PApri=PApri,N0pri=N0pri,ICvec=ICvec,Snp=Snp) 
 #
 init_fun <- function() {list(sigF=runif(1, .5, .8),
                              sigH=runif(1, .5, 1),
@@ -170,7 +172,7 @@ params <- c("sigF","sigH","sigS","tau","phi","thta","beta1","beta2",
             "gamma_0","S0_ld","S0_hd","gamma_A","SA_ld","SA_hd","epsF","epsS",
             "Pups_pred","gamma_H0","gamma_HA","H0_pred","HA_pred",
             "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","haz_Ice",
-            "nphz","log_lik","y_new1","y_new2") # 
+            "log_lik","y_new1","y_new2") # 
 #
 cores = detectCores()
 ncore = min(20,cores-1)
@@ -197,7 +199,7 @@ out <- stan(
   cores = ncore,           # number of available cores 
   refresh = 100,           # show progress every 'refresh' iterations
   # increase adapt_delta and max_treedepth to help find optimal vals
-  control = list(adapt_delta = 0.9, max_treedepth = 12) 
+  control = list(adapt_delta = 0.85, max_treedepth = 11) 
 )
 #
 # generate summary stats (sumstats, mcmc matrix)
@@ -210,18 +212,6 @@ vns = row.names(sumstats)
 #
 # Some traceplots to inspect results
 traceplot(out, pars=c("sigF","sigS","sigH"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("beta1"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("beta2"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("alpha0"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("alpha1"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("alpha2"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("phi"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("thta"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("zeta"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("gamma_H0_mn"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("gamma_HA_mn"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("dlta"), inc_warmup = F, nrow = 2)
-traceplot(out, pars=c("psi1","psi2"), inc_warmup = F, nrow = 2)
 #
 rm(out)
 #

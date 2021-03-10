@@ -47,6 +47,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
   }
   iy = c(rep(1,20),seq(2,Nyrs-1))
   iz = numeric(length = length(iy)); iz[1:19] = 1
+  npsv = 0.95
   # Create some arrays for saving results
   N_Predict = array(dim=c(Nyrs,1))
   P_Predict = array(dim=c(Nyrs-1,1))
@@ -117,7 +118,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     Nml[1] = N[1]/1000000 
     # Loop through years to calculate demographic transitions and population dynamics 
     for (ix in 1:length(iy)){
-      npsv = 1-(gtools::inv.logit(rnorm(1,0,1))/10) 
+      # npsv = 1-(gtools::inv.logit(rnorm(1,0,1))/10) 
       i = iy[ix]
       if (i == 1){
         n[,i] = sad0 * N[i]
