@@ -5,7 +5,6 @@
 // Section 1. Data inputs for model
 data {
   int<lower=1> NPcts;             // N counts of pups, total (across 3 areas)
-  int<lower=1> NPActs;            // N counts of pups by area 
   int<lower=1> NCages;            // N age classes used for age composition comparisons 
   int<lower=1> NCage1;            // first age class for obs. age composition (5? 7?)
   int<lower=1> NCobs;             // N observations of age composition vectors
@@ -27,102 +26,95 @@ data {
   real<lower=0> Pups[NPcts];      // pup counts, total
   real<lower=0> sdNP[NPcts];      // s.d. associated with total pup counts
   int<lower=1> YrPct[NPcts];      // Year of each pup count (total counts)
-  int<lower=0> PAidx[NPActs];     // index variable: years w. area-specific counts  
-  matrix[NPActs,Nareas] NPA;      // observed pup proportions by area & year 
+  matrix[Nyrs-1,Nareas] PA;       // pup proportions by area & year (estimated for years with no area counts)
   int<lower=1> YrAGsmp[NCobs];    // Year of each female age composition sample 
   int<lower=1> YrPRsmp[NPRobs];   // Year of each female pregnancy status sample 
   int<lower=1> AgePRsmp[NPRobs];  // Age of each female pregnancy status sample
   real N0pri ;                    // mean for vague prior estimate of starting abundance
   real omega;                     // Nuiscance param: base log hazards
-  real psipri1a ;                 // Ice anomaly effect on pup survival, fxn param 1 mn
-  real<lower=0> psipri1b ;        // Ice anomaly effect on pup survival, fxn param 1 sd
-  real<lower=0> psipri2a ;        // Ice anomaly effect on pup survival, fxn param 2 mn
-  real<lower=0> psipri2b ;        // Ice anomaly effect on pup survival, fxn param 2 sd
-  matrix[Nareas-1,2] PApri;       // beta prior estimates for proportional pups by area
+  real psipri1 ;                  // Ice anomaly effect on pup survival, fxn param 1 mn
+  real<lower=0> psipri2 ;         // Ice anomaly effect on pup survival, fxn param 2 mn
   real CV_HV ;                    // CV associated with harvest counts
   vector[Nyrs-1] Q_0 ;            // probability that a harvested pup is observed (and not SnL) 
   vector[Nyrs-1] Q_A;             // probability that a harvested adult is observed (and not SnL) 
   vector[41] ICvec ;              // dummy vector of ice anomaly values, -1 to 1
-  vector[Nyrs-1] Snp ;            // average newborn pup survival   
+  vector[Nyrs-1] Snp ;            // average newborn pup survival by year
 }
 // Section 2. The parameters to be estimated 
 parameters {
-  real<lower=0> alpha0 ;          // base adult log haz (for 10 yr old)
-  real<lower=0> alpha1 ;          // adult log haz age modifier par 1
-  real<lower=0> alpha2 ;          // adult log haz age modifier par 2
-  real<lower=0> nu ;               // log haz ratio for juv relative to sub-adlt   
-  simplex[NCages] pie[NCobs];      // probs of age counts (for multinomial)
-  vector<lower=0,upper=0.45>[Nyrs-1] PA1 ; // proportion pups in area 1
-  vector<lower=0,upper=0.45>[Nyrs-1] PA2 ; // proportion pups in area 2
-  real<lower=0,upper=4> thta[2];   // theta params: controls "shape" of DD (for Fecundity and survival)
-  real<lower=0> phi[2];            // D-D effects for fecundity (1) and survival (2)
-  real<lower=0,upper=10> beta1;    // Fecundity: Logit of max adult pregancy rate
-  real<lower=0,upper=1> beta2;     // Fecundity: age effect (reduced for younger)
-  real psi1;                       // Ice anomaly effect on pup survival, fxn param 1 
-  real<lower=0> psi2;              // Ice anomaly effect on pup survival, fxn param 2 
-  real<lower=.001> N0mil;          // Initial Abundance, year 1 of time series (i millions)
-  real dlta;                       // Effect of environmental conditions on fecundity
-  real<lower=0> sigF;              // Environmental stocasticity, var in pregnancy rates
-  real<lower=0> sigS;              // Environmental stocasticity, var in juv survival rates 
-  real<lower=0> sigH;              // Variance in Harvest log hazard rate 
-  real<lower=0> tau;               // precision param for dirichlet-multinomial age dist
-  real epsF[Nyrs-1];               // Stochastic effects on fecundity, by year
-  real epsS[Nyrs-1];               // Stochastic effects on juv survival, by year
-  // real nphz[Nyrs-1];               // Stochastic Newborn pup hazards (e.g. abortion, abandonment)
-  real<lower=0> gamma_H0_mn ;      // Mean Harvest log hazard rate, Juvenile
-  real<lower=0> gamma_HA_mn;       // Mean Harvest log hazard rate, Adult
-  real gamma_H0[Nyrs-1];           // Annual harvest log hazard rate, Juvenile (beaters)
-  real gamma_HA[Nyrs-1];           // Annual harvest log hazard rate, Adults (age 1+)
-  real<lower=0,upper=1> zeta ;     // proportional D-D strength for sub-adults relative to juveniles
+  real<lower=0> alpha0 ;                  // base adult log haz (for 10 yr old)
+  real<lower=0> alpha1 ;                  // adult log haz age modifier par 1
+  real<lower=0> alpha2 ;                  // adult log haz age modifier par 2
+  real<lower=0> nu ;                      // log haz ratio for juv relative to sub-adlt   
+  simplex[NCages] pie[NCobs];             // probs of age counts (for multinomial)
+  real<lower=0,upper=4> thta[2];          // theta params: controls "shape" of DD (for Fecundity and survival)
+  real<lower=0> phi[2];                   // D-D effects for fecundity (1) and survival (2)
+  real<lower=0,upper=10> beta1;           // Fecundity: Logit of max adult pregancy rate
+  real<lower=0,upper=1> beta2;            // Fecundity: age effect (reduced for younger)
+  real psi1 ;                             // Ice anomaly effect on pup survival, fxn param 1 
+  real<lower=0> psi2;                     // Ice anomaly effect on pup survival, fxn param 2 
+  real<lower=.001> N0mil;                 // Initial Abundance, year 1 of time series (i millions)
+  real dlta;                              // Effect of environmental conditions on fecundity
+  real<lower=0> sigF;                     // Environmental stocasticity, var in pregnancy rates
+  real<lower=0> sigS;                     // Environmental stocasticity, var in juv survival rates 
+  real<lower=0> sigH;                     // Variance in Harvest log hazard rate 
+  real<lower=0> tau;                      // precision param for dirichlet-multinomial age dist
+  real epsFs[Nyrs-1];                     // Stochastic effects on fecundity, by year (stdzd)
+  real epsSs[Nyrs-1];                     // Stochastic effects on juv survival, by year (stdzd)
+  real<lower=0> gamma_H0_mn ;             // Mean Harvest log hazard rate, Juvenile
+  real<lower=0> gamma_HA_mn;              // Mean Harvest log hazard rate, Adult
+  real gamma_H0s[Nyrs-1];                 // Annual harvest log hazard rate, Juvenile (beaters) (stdzd)
+  real gamma_HAs[Nyrs-1];                 // Annual harvest log hazard rate, Adults (age 1+) (stdzd)
+  real<lower=0,upper=1> zeta ;            // proportional D-D strength for sub-adults relative to juveniles
 }
 // Section 3. Additional transformed parameters, including key model dynamics
 transformed parameters {
   real N0 ;                             // initial abundance (year 1)
+  vector[Nyrs-1] epsF;                  // Stochastic effects on fecundity, by year 
+  vector[Nyrs-1] epsS;                  // Stochastic effects on juv survival, by year 
+  vector[Nyrs-1] gamma_H0;              // Annual harvest log hazard rate, Juvenile (beaters) 
+  vector[Nyrs-1] gamma_HA;              // Annual harvest log hazard rate, Adults (age 1+) 
   vector[Nages] gamma_A ;               // log hazard ratio for adults
   real gamma_0 ;                        // log hazard ratio for juveniles
-  matrix[Nyrs-1,Nareas] PA;             // predicted pup proportions by area & year 
   real<lower=0> N[Nyrs] ;               // Population abundance by year
   vector<lower=0>[Nages] n[Nyrs] ;      // Population vector, by year
   vector<lower=0>[Nages] Fc[Nyrs-1] ;   // Fecundity vector, by year
   real<lower=0> S0[Nyrs-1] ;            // Juv Survival from all competing hazards 
-  // vector<lower=0>[Nyrs-1] Snp ;          // Newborn pup survival (from abortion, abandonment) 
-  vector<lower=0>[Nages] SA[Nyrs-1];     // Adult Survival from all competing hazards
-  real<lower=0> Pups_pred[Nyrs-1] ;       // Predicted pups available for counting, by year  
-  vector<lower=0>[Nyrs-1] H0_pred_ALL ;// predicted harvest numbers by year, pups (including SNL)
-  vector<lower=0>[Nyrs-1] HA_pred_ALL ;// predicted harvest numbers by year, adults (age1+) (including SNL)
-  vector<lower=0>[Nyrs-1] H0_pred ;    // predicted harvest numbers by year without SnL, pups
-  vector<lower=0>[Nyrs-1] HA_pred ;    // predicted harvest numbers by year without SnL, adults
-  vector[41] haz_Ice ; // Hazards associated with ice anomalies
+  vector<lower=0>[Nages] SA[Nyrs-1];    // Adult Survival from all competing hazards
+  real<lower=0> Pups_pred[Nyrs-1] ;     // Predicted pups available for counting, by year  
+  vector<lower=0>[Nyrs-1] H0_pred_ALL ; // predicted harvest numbers by year, pups (including SNL)
+  vector<lower=0>[Nyrs-1] HA_pred_ALL ; // predicted harvest numbers by year, adults (age1+) (including SNL)
+  vector<lower=0>[Nyrs-1] H0_pred ;     // predicted harvest numbers by year without SnL, pups
+  vector<lower=0>[Nyrs-1] HA_pred ;     // predicted harvest numbers by year without SnL, adults
+  vector[41] haz_Ice[2] ;               // Hazards associated with ice anomalies, Gulf and front
+  // Re-scale and re-center the random effect variables from standardized normal 
   N0 = N0mil * 1000000 ;
-  // Assign proportion of pups in each breeding area
-  PA[,1] = PA1;
-  PA[,2] = PA2;
-  PA[,3] = rep_vector(1,Nyrs-1) - (PA1 + PA2);
-  // overwrite PA values with observed proportions for years available
-  PA[PAidx] = NPA ;
-  // Newborn pup survival for each year (stochastic)
-  // Snp = 1 - (inv_logit(to_vector(nphz)) * 0.1) ;
+  epsF = to_vector(epsFs) * sigF ;
+  epsS = to_vector(epsSs) * sigS ;
+  gamma_H0 = to_vector(gamma_H0s) * sigH + gamma_H0_mn;
+  gamma_HA = to_vector(gamma_HAs) * sigH + gamma_HA_mn;
   // Initize pop vector  
   N[1] = N0 ;                     // Initialize population, year 1
   n[1] = sad0 * N[1];             // Initialize population vector, year 1
   // Calculate adult and juvenile log hazards (baseline). 
   gamma_A = alpha0 - alpha1 * agesC + alpha2 * agesC2 ;
   gamma_0 = alpha0 - alpha1 * agesC[1] + alpha2 * agesC2[1] + nu ;
-  // Ice hazard function
-  haz_Ice = exp(omega + 8 * exp(psi1 - (ICvec * psi2)) ./ (1 + exp(psi1 - (ICvec * psi2)))) ;
+  // Ice hazard functions for Gulf and Front
+  haz_Ice[1] = exp(omega + 8 * exp(psi1 - (ICvec * psi2)) ./ (1 + exp(psi1 - (ICvec * psi2)))) ;
+  haz_Ice[2] = exp(omega + 8 * exp((psi1-1) - (ICvec * psi2)) ./ (1 + exp((psi1-1) - (ICvec * psi2)))) ;
   // Loop through years to calculate demographic transitions and population dynamics 
   for (i in 1:(Nyrs-1)){
     // Declare some temporary variables for this year:
     real Nml ;                    // Current population abundance in millions
     real haz_J ;                  // Juv baseline hazards
     vector[Nages] haz_A ;         // Adult baseline hazards    
-    real haz_IC ;                  // Weighted mean ice hazards (juvenile)
-    real haz_H0 ;                // Harvest hazards, juvenile  
-    real haz_HA ;                // Harvest hazards, adult     
+    real haz_IC ;                 // Weighted mean ice hazards (juvenile)
+    real haz_H0 ;                 // Harvest hazards, juvenile  
+    real haz_HA ;                 // Harvest hazards, adult     
     real prp_HV_0 ;               // Proportion of mortality comprised of harvest, Juve 
     vector[Nages] prp_HV_A ;      // Proportion of mortality comprised of harvest, Adult
-    real gamma_D ;               // density-dependent effect for juveniles/subadults
-    // current N in millions of anials, for D-D calcs
+    real gamma_D ;                // density-dependent effect for juveniles/subadults
+    // current N in millions of animals, for D-D calcs
     Nml = N[i]/1000000 ;
     // Annual Fecundity, with D-D, envir. effects and stochasticity 
     Fc[i][1:3] = rep_vector(0,3) ;
@@ -132,7 +124,7 @@ transformed parameters {
     gamma_D = pow(phi[2]*Nml, thta[2]) ;
     haz_J = exp(omega + gamma_0 + gamma_D + epsS[i] ) ; // normal juv hazards
     // weighted avg ice anom haz (wt = prop. pups in each area)
-    haz_IC = PA[i][1] * haz_Ice[IC[i,1]] + PA[i][2] * haz_Ice[IC[i,2]] + PA[i][3] * haz_Ice[IC[i,3]] ;
+    haz_IC = PA[i][1] * haz_Ice[1][IC[i,1]] + PA[i][2] * haz_Ice[1][IC[i,2]] + PA[i][3] * haz_Ice[2][IC[i,3]] ;
     haz_H0 = exp(omega + gamma_H0[i]) ; // hazards from bycatch/human harvest of pups/beaters
     S0[i] = exp(-1 * (haz_J + haz_IC + haz_H0)) ;  // combine hazards for Juv survival
     // Adult competing hazards and net survival (allow weak DD effects for sub-adults)
@@ -179,60 +171,57 @@ model {
   }
   // B) Prior distributions for model parameters:
   // Hierarchical random effects: NOTE: maybe make annual stochastic effects autoregressive (AR[1])?  
-  epsF ~ normal(0,sigF) ;          // Annual deviations from mean fecundity
-  epsS ~ normal(0,sigS) ;          // Annual deviations from mean juv hazards
-  // nphz ~ normal(0,1) ;             // Annual pre-survey newborn hazards
-  gamma_H0 ~ normal(gamma_H0_mn,sigH); // Annual pup harvest log hazards
-  gamma_HA ~ normal(gamma_HA_mn,sigH); // Annual adult harvest log hazards
-  PA1 ~ beta(PApri[1,1],PApri[1,2]) ; // Annual proportion of pups area 1
-  PA2 ~ beta(PApri[2,1],PApri[2,2]) ; // Annual proportion of pups area 2
-  // Base parameters:
-  N0mil ~ normal(2.5,1) ; 
-  thta ~ gamma(3,2) ;
+  epsFs ~ normal(0,1) ;               // Annual deviations from mean fecundity (stdzd)
+  epsSs ~ normal(0,1) ;               // Annual deviations from mean juv hazards (stdzd)
+  gamma_H0s ~ normal(0,1);            // Annual pup harvest log hazards (stdzd)
+  gamma_HAs ~ normal(0,1);            // Annual adult harvest log hazards (stdzd)
+  // Base parameter priors:
+  N0mil ~ normal(2,1) ; 
+  thta ~ gamma(5,4) ;
   phi ~ normal(0,1) ;
   beta1 ~ normal(0,5) ;
-  beta2 ~ normal(0,.5) ;
-  psi1 ~ normal(psipri1a,psipri1b) ;
-  psi2 ~ normal(psipri2a,psipri2b) ;
-  dlta ~ normal(0,.25) ;
-  sigF ~ normal(0,2.5) ;
-  sigH ~ normal(0,2.5) ;
-  sigS ~ normal(0,2.5) ;
+  beta2 ~ normal(0,1) ;
+  psi1 ~ normal(-1,1) ;
+  psi2 ~ normal(5,1) ;
+  dlta ~ normal(0,1) ;
+  sigF ~ normal(0,1) ;
+  sigH ~ normal(0,1) ;
+  sigS ~ normal(0,1) ;
   tau ~ cauchy(0,5) ;
   gamma_H0_mn ~ normal(6,1) ;
-  gamma_HA_mn ~ normal(3.5,1) ;
-  alpha0 ~ normal(3,1.5) ;
-  alpha1 ~ normal(0,.25) ;
-  alpha2 ~ normal(0,.025) ;
-  nu ~ normal(0,.5) ;
+  gamma_HA_mn ~ normal(4,1) ;
+  alpha0 ~ normal(3,1) ;
+  alpha1 ~ normal(0,.5) ;
+  alpha2 ~ normal(0,0.1) ;
+  nu ~ normal(0,1) ;
   zeta ~ beta(1,5) ;
 }
 // Section 5. Derived parameters and statistics 
 generated quantities {
-  real PAmean[Nareas] ;  /// mean PA values
-  real Fc8_prdct[Nyrs-1] ;  // Predicted fecundity rate for 8+ over years
-  vector[Nages] Fc1966_prdct ;  // Predicted fecundity rate for all ages, 1966
-  vector[Nages] Fc2016_prdct ;  // Predicted fecundity rate for all ages, 2016
-  real S0_ld ;            // Predicted first year survival, low pop density (2 mil)
-  vector[Nages] SA_ld ;  // Predicted survival rates for adult ages, low pop density (2 mil)
-  real S0_hd ;            // Predicted first year survival, high pop density (6 mil)
-  vector[Nages] SA_hd ;  // Predicted survival rates for adult ages, high pop density (6 mil)
-  real log_lik[NPcts+NPRobs] ;    // Log liklihood of obs. data (for LooIC)
-  real y_new1[NPcts]  ;    // New observations
-  real y_new2[NPRobs]  ;    // New observations  
-  real P_resid1[NPcts]  ;   // Pearson residuals from observed data
-  real P_resid_new1[NPcts]; // Pearson residuals from new data
-  real P_resid2[NPRobs]  ;   // Pearson residuals from observed data
-  real P_resid_new2[NPRobs]; // Pearson residuals from new data
-  real Tstat1 ;      // Test stat for PPC (sum of squared pearson resids)
-  real Tstat_new1 ;  // New data test stat (sum of squared pearson resids)
-  real Tstat2 ;      // Test stat for PPC (sum of squared pearson resids)
-  real Tstat_new2 ;  // New data test stat (sum of squared pearson resids)
-  real Tstat ;      // Test stat for PPC (sum of squared pearson resids)
-  real Tstat_new ;  // New data test stat (sum of squared pearson resids)
-  real ppp1 ;        // Posterior predictive check Bayesian P-value
-  real ppp2 ;        // Posterior predictive check Bayesian P-value
-  real ppp ;        // Posterior predictive check Bayesian P-value
+  real PAmean[Nareas] ;               // mean PA values
+  real Fc8_prdct[Nyrs-1] ;            // Predicted fecundity rate for 8+ over years
+  vector[Nages] Fc1966_prdct ;        // Predicted fecundity rate for all ages, 1966
+  vector[Nages] Fc2016_prdct ;        // Predicted fecundity rate for all ages, 2016
+  real S0_ld ;                        // Predicted first year survival, low pop density (2 mil)
+  vector[Nages] SA_ld ;               // Predicted survival rates for adult ages, low pop density (2 mil)
+  real S0_hd ;                        // Predicted first year survival, high pop density (6 mil)
+  vector[Nages] SA_hd ;               // Predicted survival rates for adult ages, high pop density (6 mil)
+  real log_lik[NPcts+NPRobs] ;        // Log liklihood of obs. data (for LooIC)
+  real y_new1[NPcts]  ;               // New observations, pup counts
+  real y_new2[NPRobs]  ;              // New observations, preg rates 
+  real P_resid1[NPcts]  ;             // Pearson residuals from observed data
+  real P_resid_new1[NPcts];           // Pearson residuals from new data
+  real P_resid2[NPRobs]  ;            // Pearson residuals from observed data
+  real P_resid_new2[NPRobs];          // Pearson residuals from new data
+  real Tstat1 ;                       // Test stat for PPC (sum of squared pearson resids)
+  real Tstat_new1 ;                   // New data test stat (sum of squared pearson resids)
+  real Tstat2 ;                       // Test stat for PPC (sum of squared pearson resids)
+  real Tstat_new2 ;                   // New data test stat (sum of squared pearson resids)
+  real Tstat ;                        // Test stat for PPC (sum of squared pearson resids)
+  real Tstat_new ;                    // New data test stat (sum of squared pearson resids)
+  real ppp1 ;                         // Posterior predictive check Bayesian P-value
+  real ppp2 ;                         // Posterior predictive check Bayesian P-value
+  real ppp ;                          // Posterior predictive check Bayesian P-value
   int<lower=0> c;
   for (i in 1:(Nyrs-1)){
     Fc8_prdct[i] = Fc[i][8] ;
@@ -240,9 +229,9 @@ generated quantities {
   Fc1966_prdct = Fc[16][1:Nages];
   Fc2016_prdct = Fc[66][1:Nages];
   SA_ld = exp(-1 * (exp(omega + gamma_A + pow(phi[2]*2,thta[2]) * zeta * (1 ./ ages)) +  exp(omega))) ;
-  S0_ld =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*2, thta[2])) + haz_Ice[21] + exp(omega) )) ;
+  S0_ld =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*2, thta[2])) + haz_Ice[1][21] + exp(omega) )) ;
   SA_hd = exp(-1 * (exp(omega + gamma_A + pow(phi[2]*6,thta[2]) * zeta * (1 ./ ages)) +  exp(omega))) ;
-  S0_hd =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*6, thta[2])) + haz_Ice[21] + exp(omega) )) ;
+  S0_hd =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*6, thta[2])) + haz_Ice[1][21] + exp(omega) )) ;
   c = 0 ;
   for (i in 1:NPcts){
     c = c+1 ;

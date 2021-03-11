@@ -48,6 +48,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
   iy = c(rep(1,20),seq(2,Nyrs-1))
   iz = numeric(length = length(iy)); iz[1:19] = 1
   npsv = 0.95
+  psiadj = c(0,0,-1)
   # Create some arrays for saving results
   N_Predict = array(dim=c(Nyrs,1))
   P_Predict = array(dim=c(Nyrs-1,1))
@@ -141,7 +142,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       #  Juvenile competing hazards and net realized survival
       haz_0 = exp(omega + gamma_0 + (phiS*Nml[i])^thtaS + epsS[i]) ; #  + epsJ[i]
       for(a in 1:Nareas){ 
-        gamma_I[a] = 8 * exp(psi1 - (IC[i,a] * psi2)) / (1 + exp(psi1 - (IC[i,a] * psi2))) 
+        gamma_I[a] = 8 * exp((psi1+psiadj[a]) - (IC[i,a] * psi2)) / (1 + exp((psi1+psiadj[a]) - (IC[i,a] * psi2))) 
         haz_I_A[a] = exp(omega + gamma_I[a]) 
       } 
       haz_I = sum(PA[,i] * haz_I_A)

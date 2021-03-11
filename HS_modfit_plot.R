@@ -232,7 +232,7 @@ print(pl8)
 pl8b = ggplot(data=dp8,aes(x=Year,y=epsS)) +
   geom_ribbon(aes(ymin=epsS_lo,ymax=epsS_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Juvenile log hazards, deviation from mean") +
-  ggtitle("Stoachastic variation in juvenile survival") + theme_bw()
+  ggtitle("Stoachastic variation in juvenile mortality") + theme_bw()
 print(pl8b)
 
 # Age-specific survival -----------------------------------------------------------
@@ -253,7 +253,7 @@ dp9 = rbind(dp9, data.frame(Density = "High", Age = 0,
                         Survival_lo = sumstats[which(vns =="S0_hd"),4],
                         Survival_hi = sumstats[which(vns =="S0_hd"),8]), tmp)
 dp9 = dp9[-which(dp9$Age==Nages),]
-
+dp9$Density = factor(dp9$Density, levels = c("Low","High"))
 pl9 = ggplot(data=dp9,aes(x=Age,y=Survival,group=Density,fill=Density)) +
   geom_ribbon(aes(ymin=Survival_lo,ymax=Survival_hi),alpha=0.2) +
   scale_fill_manual(name = "Abundance",labels = c("2 million","6 million"),
@@ -267,9 +267,9 @@ print(pl9)
 #
 # Ice anomaly effect on pup survival---------------------------------------
 dp10 = data.frame(Ice_Anomaly = ICvec)
-dp10$Haz = sumstats[which(startsWith(vns,"haz_Ice[")),1]
-dp10$Haz_lo = sumstats[which(startsWith(vns,"haz_Ice[")),4]
-dp10$Haz_hi = sumstats[which(startsWith(vns,"haz_Ice[")),8]
+dp10$Haz = sumstats[which(startsWith(vns,"haz_Ice[1")),1]
+dp10$Haz_lo = sumstats[which(startsWith(vns,"haz_Ice[1")),4]
+dp10$Haz_hi = sumstats[which(startsWith(vns,"haz_Ice[1")),8]
 dp10$SvIce = exp(-1 * (dp10$Haz))
 dp10$SvIce_lo = exp(-1 * (dp10$Haz_hi))
 dp10$SvIce_hi = exp(-1 * (dp10$Haz_lo))
@@ -277,7 +277,7 @@ pl10 = ggplot(dp10,aes(x=Ice_Anomaly,y=SvIce)) +
   geom_ribbon(aes(ymin=SvIce_lo,ymax=SvIce_hi),alpha=0.3) +
   geom_line() + geom_vline(xintercept = 0) +
   labs(x="Ice Anomaly (deviation from 1969-2000 mean cover)",y="Pup survival from ice hazards") +
-  ggtitle("Effect of ice cover on pup survival") +
+  ggtitle("Effect of ice cover on pup survival (Gulf)") +
   theme_classic()
 print(pl10)
 #
