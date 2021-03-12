@@ -2,11 +2,12 @@ Results/
 Oldcode/
 HSmodel.Rproj
 Results.rdata
+HSmodfit.rds
+HSmodel_summary.html
+HSmodfit.exe
 .Rhistory
 .Rproj.user
 *.rdata
 *.rds
 *.html
-HSmodfit.rds
-HSmodel_summary.html
-HSmodfit.exe
+
