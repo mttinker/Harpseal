@@ -3,7 +3,8 @@ title: "Harp Seal Population Dynamics Estimated Using a Bayesian Hierarchical Mo
 author: "Prepared for Department of Fisheries and Oceans by M. Tim Tinker"
 date: "3/31/2021"
 output:
-  bookdown::html_document2: default
+  bookdown::html_document2: default 
+  #  bookdown::word_document2: default
 editor_options:
   chunk_output_type: console
 ---
@@ -46,7 +47,7 @@ Yearp = seq(Year1,Year1+Nyrs-1)
 The methods for analyzing the harp seal population can be described in three parts: 1) the process model, a series of equations that describe demographic transitions and which, when solved, predict dynamics in the variables of interest (e.g. population abundance) based on the values of the input parameters; 2) the data model, which describes how empirical data sets are related to the predicted dynamics of the process model; 3) model fitting, which describes how input parameters are estimated.  
 
 ## Process model
-Population dynamics are described using discrete annual time steps and formulated assuming a pre-breeding survey (i.e. the population state at time *t* corresponds to the state at the beginning of a pupping season). The population is age-structured, such that a population vector *n*(*i,t*) describes the number of individuals in age class *i* (*i* = 1,2... 36) at year *t*, and *N*(*t*) is the sum of *n*(*i,t*) across age classes. We note that the last age class, *i* = 36, represents a multi-year class comprised of all animals older than 35 yrs; also, we assume a 50:50 sex ratio for all age classes (i.e. we assume survival rates are similar for males and females). Under the assumption of a pre-breeding survey, the first entry in the population vector (*n*(1)) represents juveniles just recruiting to the adult population (i.e., pups born the previous year that have survived to their first birthday). Demographic transitions from year *t* to year *t+1* are calculated from annually varying vital rates, including fecundity (*F*), juvenile survival ($S_{0}$, the probability a pup survives from weaning to its first birthday), and adult survival ($S_{A}$, the probability an individual of age *i* survives to the next year). Vital rates are assumed to be density-dependent, meaning that they can vary as functions of relative population abundance (*N*, which for computational tractability we re-scale to units of millions of animals, *N'*) and are also affected by annually-varying environmental conditions, ice cover and harvest/bycatch mortality (Hammill and Sauvé 2017). Specifically, annual vital rates are computed as functions of these variables and various model input parameters (see Table 1), as described in the following sections.
+Population dynamics are described using discrete annual time steps and formulated assuming a pre-breeding survey (i.e. the population state at time *t* corresponds to the state at the beginning of a pupping season). The population is age-structured, such that a population vector *n*(*i,t*) describes the number of individuals in age class *i* (*i* = 1,2... 36) at year *t*, and *N*(*t*) is the sum of *n*(*i,t*) across age classes. We note that the last age class, *i* = 36, represents a multi-year class comprised of all animals older than 35 yrs; also, we assume a 50:50 sex ratio for all age classes (i.e. we assume survival rates are similar for males and females). Under the assumption of a pre-breeding survey, the first entry in the population vector (*n*(1)) represents juveniles just recruiting to the adult population (i.e., pups born the previous year that have survived to their first birthday). Demographic transitions from year *t* to year *t+1* are calculated from annually varying vital rates, including fecundity (*F*), juvenile survival ($S_{0}$, the probability a pup survives from weaning to its first birthday), and adult survival ($S_{A}$, the probability an individual of age *i* survives to the next year). Vital rates are assumed to be density-dependent, meaning that they can vary as functions of relative population abundance (*N*, which for computational tractability we re-scale to units of millions of animals, *N'*) and are also affected by annually-varying environmental conditions, ice cover and harvest/bycatch mortality (Hammill and Sauvé 2017). Specifically, annual vital rates are computed as functions of these variables and various model input parameters (see Table 2.1), as described in the following sections.
 
 ### Fecundity
 The factors that determine the probability a female gives birth (or at least reaches late-stage pregnancy) at year *t* are her age (*i*), current population abundance (*N’*(*t*)), an environmental condition index (*CE*), and unexplained variance or environmental stochasticity (Stenson and Hammill 2014, Stenson et al 2014). Fecundity is set to 0 for females aged 1-3 yrs, and for females aged 4 - 8 it is calculated using a logit function:
@@ -118,7 +119,7 @@ $$
 where $\% icecov(a,t)$ is the % ice cover for breeding area *a* in year *t*, and $avg.[ \% icecov(a)]$ is the average % ice cover for breeding area *a* over the period 1969-2000. The ice anomaly index (*IC*) thus varies between 1 and -1, with 0 corresponding to an 'average' year between 1969 and 2000 and values significantly less than 0 indicating anomalously low ice cover. The functional relationship between log-hazards from poor ice conditions and *IC* was defined based on the recognition that in years with average or above-average ice cover, there is little or no mortality, but in years when the ice cover is significantly below average the mortality rate increases sharply. Accordingly, we calculate ice-related log hazards for each breeding area and year using a re-scaled logit function:
 $$
 \begin{equation}
-{\gamma_{IC}}(a,t) = ({\omega}+1) \cdot inv.logit[{\psi_1} - {\psi_2} \cdot IC(a,t)] (\#eq:f9)
+{\gamma_{IC}}(a,t) = ({-\omega}+1) \cdot inv.logit[{\psi_1} - {\psi_2} \cdot IC(a,t)] (\#eq:f9)
 \end{equation}
 $$
 
@@ -324,7 +325,7 @@ where the standard error values for observed harvest estimates correspond to an 
 ## Model fitting
 The observed data variables constrain the possible values of unknown parameters in the process model, allowing us to estimate posterior distributions for these parameters using standard Markov Chain Monte Carlo (MCMC) methods. We use vague prior distributions for most parameters (i.e., weakly informed based on biological feasibility but having no information specific to the analysis), including Gamma priors for $N_0$ and $\theta$, normal priors for other parameters and half-normal priors for those parameters (such as variances) that were logically constrained to be positive (Gelman 2006, Gelman et al. 2008). For the ice-anomaly effect parameters ($\psi_1$ and $\psi_2$) we used weakly-informed normal priors with means of -1.5 and 5 (respectively) and standard deviations 1, as these values produced a range of functional relationships between ice anomalies and pup mortality that agreed well with existing information on ice-based pup mortality. We used R (R.Core.Team 2014) and Stan software (Carpenter et al. 2017) to code and fit the model, saving 20,000 samples after a burn-in of 1000 samples. We evaluated model convergence by graphical examination of trace plots from 20 independent chains and by ensuring that Gelman-Rubin convergence diagnostic (R-hat) was <1.1 for all fitted model parameters. We conducted graphical posterior predictive checking to evaluate model goodness of fit, ensuring that out-of-sample predictive distributions of pup abundance and female pregnancy rates were consistent with distributions of observed data. As an additional goodness-of-fit check, we created "out-of-sample" hind-case projections of population dynamics to compare to the fitted model projections. Specifically, for each simulation we initiated a new 1951 population at ${N_0}$, and then projected forward for *T* years with the process model parameterized by drawing from the joint posteriors of all parameters and with random effects drawn randomly from their appropriate distributions. In the case of a well-fit model, the estimated abundance projection should fall within the distribution of out-of-sample hind-cast projections. 
 
-Model results are summarized by reporting the mean and 95% Credible Interval (CI) of the posterior distributions for base model parameters (Table 1) and derived parameters. 
+Model results are summarized by reporting the mean and 95% Credible Interval (CI) of the posterior distributions for base model parameters (Table 2.1) and derived parameters. 
 
 ## Model simulations
 We generated projections of future population dynamics under various scenarios by running Monte Carlo simulations of the process model, parameterized by drawing from the joint posteriors of all parameters and with random effects drawn randomly from their appropriate sampling distributions. To estimate functional carrying capacity (*K*), we initiated each of 20,000 simulations with the final estimated population vector (based on model fitting to current data) and projected forward for 100 years, with harvest hazards ($\gamma _{HVJ}$ and $\gamma _{HVA}$) forced to 0 but all other parameters varying according to their fitted values. The resulting distribution of simulated trajectories therefore included the effects of ice mortality, environmental conditions, stochasticity and density-dependent effects, but not harvest mortality. The average abundance of these forward simulations generally stabilized after 50 years, so we used the mean values (and 95% CI) of the abundance over the last 50 years of the 100-year time series to estimate equilibrium abundance in the absence of harvest. A key consideration for these future simulations is how environmental conditions and ice cover may change in the future. To account for the generally declining nature of these indices, we used the distribution of *IC* and *CE* values for years after 1999 to parameterize future simulations (while noting that other projections of future conditions could also be used). 
@@ -333,7 +334,7 @@ We used a similar approach - Monte Carlo simulations of future dynamics - to est
 
 # Results
 
-Fitting the model to existing data provided excellent convergence, with R-hat<1.1 for all parameters (Table 2). Graphical posterior predictive checks (Fig. 1 and Fig. 2) indicate excellent model fit.
+Fitting the model to existing data provided excellent convergence, with R-hat<1.1 for all parameters (Table 3.1). Graphical posterior predictive checks (Fig. 1 and Fig. 2) indicate excellent model fit.
 
 ```{r Table2, echo=FALSE}
 ix = c(which(vns=="N0"),which(vns=="beta1"),which(vns=="beta2"),
@@ -388,7 +389,7 @@ ppc_stat(y, yrep, stat = "prop_preg") +
 
 <br/>
 
-Estimated fecundity rates vary as a function of age: pregnancy rates are 0 up to age 3, then increase rapidly for ages>3 to an asymptotic value by age 8 (Fig. 3). Density-dependent effects also cause a gradual reduction in pregnancy rates as population abundance increases (Fig. 4). Environmental stochasticity resulted in substantial deviations from mean expected fecundity rates over time, with a occasional "extreme" deviations such as 1960 or 2010-11 (Fig. 5). The environmental condition index had a significant and positive effect on fecundity ($\delta$ in Table 2), accounting for some of the variation in pregnancy rates. 
+Estimated fecundity rates vary as a function of age: pregnancy rates are 0 up to age 3, then increase rapidly for ages>3 to an asymptotic value by age 8 (Fig. 3). Density-dependent effects also cause a gradual reduction in pregnancy rates as population abundance increases (Fig. 4). Environmental stochasticity resulted in substantial deviations from mean expected fecundity rates over time, with a occasional "extreme" deviations such as 1960 or 2010-11 (Fig. 5). The environmental condition index had a significant and positive effect on fecundity ($\delta$ in Table 3.1), accounting for some of the variation in pregnancy rates. 
 
 <br/>
 
@@ -586,7 +587,7 @@ print(pl8)
 
 <br/>
 
-The harvest/bycatch hazards varied substantially over the time series, with the magnitude of variation measured by parameter ${\sigma _{H}}$ (Table 1, 2). Per-capita harvest/bycatch hazard ratios for juveniles (pups and beaters) were >7 times higher on average than equivalent hazard ratios for adults. The estimated annual harvest hazard rates explained virtually all variation in the observed time series of harvest/bycatch numbers (Fig. 10). 
+The harvest/bycatch hazards varied substantially over the time series, with the magnitude of variation measured by parameter ${\sigma _{H}}$ (Tables 2.1, 3.1). Per-capita harvest/bycatch hazard ratios for juveniles (pups and beaters) were >7 times higher on average than equivalent hazard ratios for adults. The estimated annual harvest hazard rates explained virtually all variation in the observed time series of harvest/bycatch numbers (Fig. 10). 
 
 <br/>
 
@@ -687,9 +688,12 @@ Absolute abundance of the harp seal population is not directly measured by empir
 
 ```{r Fig13, echo=FALSE, warning=FALSE}
 dp1 = data.frame(Year=Yearp,Nexp=sumstats[startsWith(vns,"N[")==T,1],
+                 N_sd = sumstats[startsWith(vns,"N[")==T,3],
                  N_lo = sumstats[startsWith(vns,"N[")==T,4],
                  N_hi = sumstats[startsWith(vns,"N[")==T,8])
 dp1$N2exp = c(dp1$Nexp[1:(Nyrs-1)] + sumstats[startsWith(vns,"Pups_pred[")==T,1],NA)
+dp1$N2_sd = c(sqrt( (dp1$N_sd[1:(Nyrs-1)])^2 + 
+                sumstats[startsWith(vns,"Pups_pred[")==T,3]^2),NA)
 dp1$N2_lo = c(dp1$N_lo[1:(Nyrs-1)] + sumstats[startsWith(vns,"Pups_pred[")==T,4],NA)
 dp1$N2_hi = c(dp1$N_hi[1:(Nyrs-1)] + sumstats[startsWith(vns,"Pups_pred[")==T,8],NA)
 dp1 = dp1[-Nyrs,]
@@ -722,9 +726,9 @@ print(plt_N_hindcast)
 
 <br/>
 
-In order to estimate carrying-capacity (*K*), future projections of population dynamics were generated using Monte Carlo simulations of the model, with harvest/bycatch hazards forced to 0. The distribution of future projections stabilized after several decades (Fig. 15), with the mean long-term abundance corresponding to *K* in the absence of harvest/bycatch mortality (Table 3). 
+In order to estimate carrying-capacity (*K*), future projections of population dynamics were generated using Monte Carlo simulations of the model, with harvest/bycatch hazards forced to 0. The distribution of future projections stabilized after several decades (Fig. 15), with the mean long-term abundance corresponding to *K* in the absence of harvest/bycatch mortality (Table 3.2). 
 
-A similar Monte Carlo simulation approach provided recommended TAC values under different thresholds and assumptions about the ratio of adults:pups harvested (Table 4). These TAC recommendations are based on currently-available data and model estimates of all demographic and environmental processes. 
+A similar Monte Carlo simulation approach provided recommended TAC values under different thresholds and assumptions about the ratio of adults:pups harvested (Table 3.3). These TAC recommendations are based on currently-available data and model estimates of all demographic and environmental processes. 
 
 <br/>
 
@@ -748,7 +752,7 @@ print(plt_N_Kest)
 
 Ktab1 = data.frame(Metric = "Current abundance", 
                   Mean = dp1$N2exp[Nyrs-2]/1000000, 
-                  SD = NA, 
+                  SD = dp1$N_sd[Nyrs-2]/1000000, 
                   CI95_low=dp1$N2_lo[Nyrs-2]/1000000,
                   CI95_high=dp1$N2_hi[Nyrs-2]/1000000)
 Ktab = rbind(Ktab1, Ktab)

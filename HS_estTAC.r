@@ -91,6 +91,7 @@ plt_N_hindcast = ggplot(data=dpN_HCst,aes(x=Year,y=N_pred_mean)) +
   geom_line(aes(y=N_actual),col="red") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plt_N_hindcast)
+SAD0 = as.data.frame(rslt$SAD)
 
 # Part 2: K-est sims--------------------------------------------------------------
 #
@@ -261,7 +262,7 @@ TACtab = data.frame(Pcnt_adlt=c(5,10,50),
                     TAC_N70 = c(TACN70pa05,TACN70pa10,TACN70pa50),
                     TAC_N50 =c(TACN50pa05,TACN50pa10,TACN50pa50))
 print(TACtab)
-save(file = "TAC_K_est.rdata",Kest,Kest_CI,
+save(file = "TAC_K_est.rdata",Kest,Kest_CI,SAD0,
      TACtab,Ktab,dpN_HCst,dpN_K,dat_N_Hv,plt_N_hindcast,plt_N_Kest)
 #
 stopCluster(cl)

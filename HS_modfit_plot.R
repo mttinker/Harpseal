@@ -44,9 +44,12 @@ ppc_stat(y, yrep, stat = "prop_preg") +
 #
 # Pop trends ----------------------------------------------------------------
 dp1 = data.frame(Year=Yearp,Nexp=sumstats[startsWith(vns,"N[")==T,1],
+                 N_sd = sumstats[startsWith(vns,"N[")==T,3],
                  N_lo = sumstats[startsWith(vns,"N[")==T,4],
                  N_hi = sumstats[startsWith(vns,"N[")==T,8])
 dp1$N2exp = c(dp1$Nexp[1:(Nyrs-1)] + sumstats[startsWith(vns,"Pups_pred[")==T,1],NA)
+dp1$N2_sd = c(sqrt( (dp1$N_sd[1:(Nyrs-1)])^2 + 
+                sumstats[startsWith(vns,"Pups_pred[")==T,3]^2),NA)
 dp1$N2_lo = c(dp1$N_lo[1:(Nyrs-1)] + sumstats[startsWith(vns,"Pups_pred[")==T,4],NA)
 dp1$N2_hi = c(dp1$N_hi[1:(Nyrs-1)] + sumstats[startsWith(vns,"Pups_pred[")==T,8],NA)
 tmp = read_excel("./data/OldMod_N.xlsx")
@@ -70,13 +73,10 @@ pl1b = ggplot(data=dp1,aes(x=Year,y=N2exp)) +
   geom_line(aes(y=N3exp),linetype=2,colour = "blue",size=1.1) +
   geom_line(aes(y=N3_lo),linetype=3,colour = "blue",size=1.1) +
   geom_line(aes(y=N3_hi),linetype=3,colour = "blue",size=1.1) +  
-  geom_line(aes(y=N4exp),linetype=2,colour = "red",size=1.1) +
-  geom_line(aes(y=N4_lo),linetype=3,colour = "red",size=1.1) +
-  geom_line(aes(y=N4_hi),linetype=3,colour = "red",size=1.1) +  
   scale_x_continuous(breaks = seq(Year1-1,YearT,by=5)) +
   scale_y_continuous(breaks = seq(1000000,9000000,by=1000000)) +
   ggtitle("Model estimated abundance (with pups)",
-    subtitle = "Deterministic est. for comparison: ‘2017 survey cv 50%’ (blue) and ‘2017 survey exclude 2014 +rpd data’ (red)") + 
+    subtitle = "Deterministic est. for comparison: ‘2017 survey cv 50%’ (blue)") + 
   theme_bw() 
 print(pl1b)
 #

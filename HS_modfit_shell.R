@@ -218,4 +218,5 @@ rm(out)
 # Save results --------------------------------------------------------------
 #
 save.image(file=paste0("./Results/FitHSmod_Results_",
-                       format(Sys.time(),  "%b%d_%H%M"),".rdata"))
+                       format(Sys.time(),  "%b%d_%H%M"),"_ab",Age_bias_adj*100,
+                       "_m",NCage1,".rdata"))
