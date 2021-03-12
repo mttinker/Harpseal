@@ -1,8 +1,10 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):---
-loadfile = file.choose(new = FALSE)
-load(file=loadfile)
-#
+if( !exists("sumstats") ){
+  loadfile = file.choose(new = FALSE)
+  load(file=loadfile)
+  #
+}
 require(readxl)
 require(stats)
 require(gtools)
@@ -18,7 +20,7 @@ library(doRNG)
 Year = seq(Year1,Year1+Nyrs-2)
 Yearp = seq(Year1,Year1+Nyrs-1)
 # Diagnostics -----------------------------------------------
-
+#
 # Posterior predictive check for pup counts
 y = stan.data$Pups
 rr = sample(nrow(mcmc),100,replace = T)
@@ -39,7 +41,7 @@ ppc_stat(y, yrep, stat = "prop_preg") +
   labs(x = "Mean proportion females pregnant",y="Relative frequency") +
   ggtitle("Posterior predictive check, reproductive data",
           subtitle=" Distribution of observed (y) vs. out-of-sample (y_rep) predictions")
-
+#
 # Pop trends ----------------------------------------------------------------
 dp1 = data.frame(Year=Yearp,Nexp=sumstats[startsWith(vns,"N[")==T,1],
                  N_lo = sumstats[startsWith(vns,"N[")==T,4],
@@ -55,8 +57,9 @@ tmp = read_excel("./data/OldMod_N2.xlsx")
 dp1$N4exp = tmp$N3exp
 dp1$N4_lo = tmp$N3_lo
 dp1$N4_hi = tmp$N3_hi
-
-pl1 = ggplot(data=dp1[1:(Nyrs-1),],aes(x=Year,y=Nexp)) +
+dp1 = dp1[-Nyrs,]
+dp1 = dp1[-1,]
+pl1 = ggplot(data=dp1,aes(x=Year,y=Nexp)) +
       geom_ribbon(aes(ymin=N_lo,ymax=N_hi),alpha=0.3) +
       geom_line() + labs(x = "Year",y="Estimated abundance w/o pups") +
       ggtitle("Model estimated abundance (excluding pups)") + theme_bw()
@@ -207,16 +210,16 @@ dp7$Fdev_hi = inv.logit(b0 + dp7$epsF_hi) - inv.logit(b0)
 pl7 = ggplot(data=dp7,aes(x=Year,y=Fdev)) +
   geom_ribbon(aes(ymin=Fdev_lo,ymax=Fdev_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Deviation from expected F (8+)") +
-  ggtitle("Stoachastic variation in fecundity") + theme_bw()
+  ggtitle("Stochastic variation in fecundity") + theme_bw()
 print(pl7)
 #
 # Juv survival stochasticity -------------------------------------------------------------
 gamma_0 = sumstats[which(vns=="gamma_0"),1]
+hazImn = sumstats[which(startsWith(vns,"haz_Ice[")),1][21]  
 phiS = sumstats[which(vns=="phi[2]"),1]
 thtaS = sumstats[which(startsWith(vns,"thta[2]")),1]
-psi1 = sumstats[which(startsWith(vns,"psi1")),1]
 Nml =  sumstats[which(startsWith(vns,"N[")),1]; Nml = Nml[-Nyrs]/1000000
-hzoth = exp(omega+psi1-1) + exp(omega)
+hzoth = hazImn + exp(omega)
 dp8 = data.frame(Year=Yearp[-length(Yearp)],epsS=sumstats[startsWith(vns,"epsS[")==T,1],
                   epsS_lo = sumstats[startsWith(vns,"epsS[")==T,4],
                   epsS_hi = sumstats[startsWith(vns,"epsS[")==T,8])
@@ -261,7 +264,7 @@ pl9 = ggplot(data=dp9,aes(x=Age,y=Survival,group=Density,fill=Density)) +
   geom_line(aes(color=Density),show.legend = FALSE) + 
   scale_color_manual(values = c("blue","red")) +
   labs(x = "Age (0 = juvenile)",y="Annual survival rate") +
-  ylim(c(0.4,1)) +
+  ylim(c(floor(10*min(dp9$Survival_lo))/10 ,1)) +
   ggtitle("Age-specific variation in survival at low and high population density") + theme_bw()
 print(pl9)
 #
@@ -282,7 +285,7 @@ pl10 = ggplot(dp10,aes(x=Ice_Anomaly,y=SvIce)) +
 print(pl10)
 #
 # Fecundity vs density ----------------------------------------------------
-NN = seq(.2,7.5,by=0.1)
+NN = seq(.1,6.6,by=0.1)
 lngNN = length(NN)
 iir = sample(Nsims,1000)
 b0_r = mcmc[iir,vn=="beta1"]
@@ -298,20 +301,20 @@ for(r in 1:1000){
 FC_mean = colMeans(FC)
 FC_lo = apply(FC, 2, quantile, prob=0.055)
 FC_hi = apply(FC, 2, quantile, prob=0.95)
-dp11 = data.frame(Nmil = NN, Fecundity = FC_mean,
+dp11 = data.frame(Nmil = NN*1.2, Fecundity = FC_mean,
                  FC_lo = FC_lo, FC_hi = FC_hi)
 pl11 = ggplot(dp11, aes(x=Nmil,y=Fecundity)) +
   geom_ribbon(aes(ymin=FC_lo,ymax=FC_hi),alpha=0.3) +
-  geom_line() + labs(x = "Abundance (millions), w/o pups",y="Pregnancy rate (8+)") +
+  geom_line() + labs(x = "Abundance (millions)",y="Pregnancy rate (8+)") +
   ggtitle("Density-dependent variation in adult fecundity") + theme_classic()
 print(pl11)
 #
 # Juvenile survival vs density --------------------------------------------
-NN = seq(.2,10,by=0.1)
+NN = seq(.1,6.6,by=0.1)
 gamma0_r = mcmc[iir,vn=="gamma_0"]
 phiS_r = mcmc[iir,vn=="phi[2]"]
 thtaS_r = mcmc[iir,vn=="thta[2]"]
-hazImn = sumstats[which(startsWith(vns,"haz_Ice[")),1][21]  
+hazImn = sumstats[which(startsWith(vns,"haz_Ice[1")),1][21]  
 S0 = matrix(0,nrow = 1000,ncol=length(NN))
 for(r in 1:1000){
   haz_J = exp(omega + gamma0_r[r] + ( phiS_r[r] *NN)^thtaS_r[r])  
@@ -320,11 +323,12 @@ for(r in 1:1000){
 S0_mean = colMeans(S0)
 S0_lo = apply(S0, 2, quantile, prob=0.05)
 S0_hi = apply(S0, 2, quantile, prob=0.95)
-dp12 = data.frame(Nmil = NN, S0_mean = S0_mean,
+dp12 = data.frame(Nmil = NN*1.2, S0_mean = S0_mean,
                  S0_lo = S0_lo, S0_hi = S0_hi)
 pl12 = ggplot(dp12, aes(x=Nmil,y=S0_mean)) +
   geom_ribbon(aes(ymin=S0_lo,ymax=S0_hi),alpha=0.3) +
-  geom_line() + labs(x = "Abundance (millions), w/o pups",y="Juvenile survival rate") +
+  xlim(0,8) +
+  geom_line() + labs(x = "Abundance (millions)",y="Juvenile survival rate") +
   ggtitle("Density-dependent variation in juvenile survival") + theme_classic()
 print(pl12)
 #

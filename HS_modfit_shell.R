@@ -13,7 +13,9 @@ N0pri = 2.5  # prior guess of starting pop size, in millions
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
 # Youngest adult age class to consider for age composition fitting
-NCage1 = 2; # Youngest age of adults for age composition fitting
+NCage1 = 3; # Note that ages <7 are adjusted for negative sampling bias
+# Age_bias_adj represents the increment in proportion missed for each year younger than 7
+Age_bias_adj = 0.1 # value of 0.1 means 10% missed for 6yr-olds, 20% missed for 5yr-olds...
 # Suggested Prior means 
 # Ice anomaly effects on pup survival: export opinion for prior
 psipri1 = -1  # prior for psi param1 of ice anomaly effect fxn, Gulf (see figure)
@@ -22,7 +24,7 @@ psipri2 = 5   # prior for psi param2 of ice anomaly effect fxn, Gulf
 nburnin = 500
 nsamples = 10000
 #
-# End user params -----------------------------------------------------------
+# End user parameters--------------------------------------------------------
 #
 # Load libraries-------------------------------------------------------------
 require(parallel)
@@ -45,10 +47,13 @@ Nyrs = YearT-Yr0
 omega = -7
 Nages = 36
 ages = seq(1,Nages); ages2 = ages^2
-agesC = ages - 10; agesC[Nages] = agesC[Nages] + 4; agesC2 = agesC^2
+agesC =  c(0,ages) - 10; agesC[Nages+1] = agesC[Nages+1] + 4; agesC2 = agesC^2
 NCages = length(seq(NCage1,Nages))
 NCobs = nrow(AgeComp)
-Agects = AgeComp[,NCage1:Nages]
+Agects = AgeComp
+Agects = Agects[,NCage1:Nages]
+# vector for age comp correction (bias against younger adults)
+age_ct_adj = pmax(0, rep(1,Nages) - Age_bias_adj*pmax(0,7-seq(1,Nages))) 
 NPRobs = nrow(df.Rep)
 NPcts = nrow(df.Pup)
 NPctsA = nrow(df.Pup[!is.na(df.Pup$Sgulf_N),])
@@ -140,35 +145,34 @@ stan.data <- list(NPcts=NPcts,NCages=NCages,NCage1=NCage1,NCobs=NCobs,
                   Pups=Pups,PA=PA,sdNP=sdNP,Agects=Agects,NFsamp=NFsamp,NPrg=NPrg,
                   YrPct=YrPct,PAidx=PAidx,YrAGsmp=YrAGsmp,H_0=H_0,H_A=H_A,
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,psipri1=psipri1,psipri2=psipri2,
-                  omega=omega,Q_A=Q_A,Q_0=Q_0,CV_HV=CV_HV,
+                  omega=omega,Q_A=Q_A,Q_0=Q_0,CV_HV=CV_HV,age_ct_adj=age_ct_adj,
                   PApri=PApri,N0pri=N0pri,ICvec=ICvec,Snp=Snp) 
 #
 init_fun <- function() {list(sigF=runif(1, .5, .8),
                              sigH=runif(1, .5, 1),
                              sigS=runif(1, 1, 2),
                              tau=runif(1, 5, 10),
-                             phi=runif(2, .1, .5),
-                             zeta=runif(1, .1, .2),
+                             phi=runif(2, c(.5,.1), c(1,.3)),
+                             thta = runif(2, c(.5,1.5), c(1,2)),
+                             zeta=runif(1, 3.5, 4.5),
                              beta1=runif(1, 3-.25, 3+.25),
                              beta2=runif(1, .25, .35),
                              dlta=runif(1, .05, .1),
                              gamma_H0_mn=runif(1, 5.5, 6),
                              gamma_HA_mn=runif(1, 3, 3.5),
-                             thta = runif(2, 1, 2),
                              N0mil = runif(1, N0pri*.95, N0pri*1.05),
                              alpha0 = runif(1, 2.5, 3),
                              alpha1 = runif(1, .05, .1),
-                             alpha2 = runif(1, .005, .01),
-                             nu = runif(1, .2, .3)
-)}
+                             alpha2 = runif(1, .005, .01)
+)} #  nu = runif(1, .2, .3)
 #
 params <- c("sigF","sigH","sigS","tau","phi","thta","beta1","beta2",
-            "N0","alpha0","alpha1","alpha2","nu","zeta","dlta",
+            "N0","alpha0","alpha1","alpha2","zeta","dlta",
             "psi1","psi2","gamma_H0_mn","gamma_HA_mn","N",
             "gamma_0","S0_ld","S0_hd","gamma_A","SA_ld","SA_hd","epsF","epsS",
             "Pups_pred","gamma_H0","gamma_HA","H0_pred","HA_pred",
             "Fc1966_prdct","Fc2016_prdct","Fc8_prdct","haz_Ice",
-            "log_lik","y_new1","y_new2") # 
+            "log_lik","y_new1","y_new2") # nu
 #
 cores = detectCores()
 ncore = min(20,cores-1)

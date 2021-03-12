@@ -6,15 +6,15 @@
 data {
   int<lower=1> NPcts;             // N counts of pups, total (across 3 areas)
   int<lower=1> NCages;            // N age classes used for age composition comparisons 
-  int<lower=1> NCage1;            // first age class for obs. age composition (5? 7?)
+  int<lower=1> NCage1;            // first age class considered for obs. age composition
   int<lower=1> NCobs;             // N observations of age composition vectors
   int<lower=1> NPRobs;            // N obs of age-specifc female pregnancy status (binomial)
   int<lower=1> Nyrs;              // N years for model to run (year 1 = 1951, year T = 2020?)
   int<lower=1> Nages;             // N age classes (default is 1:36)
   int<lower=1> Nareas;            // N breeding areas (default 3: Sglf, Nhglf, Front)
   vector[Nages] ages;             // vector of age class values 
-  vector[Nages] agesC;            // vector of re-centered age class values 
-  vector[Nages] agesC2;           // vector of re-centered age class values squared
+  vector[Nages+1] agesC;          // vector of re-centered age class values 
+  vector[Nages+1] agesC2;         // vector of re-centered age class values squared
   simplex[Nages] sad0;            // vector of initial stable age distribution values
   int<lower=1> IC[Nyrs,Nareas];   // Annual ice anomaly values by area (discretized, 41 steps of 0.05 units)
   real CE[Nyrs];                  // array of annual environmental index values
@@ -39,13 +39,14 @@ data {
   vector[Nyrs-1] Q_A;             // probability that a harvested adult is observed (and not SnL) 
   vector[41] ICvec ;              // dummy vector of ice anomaly values, -1 to 1
   vector[Nyrs-1] Snp ;            // average newborn pup survival by year
+  vector[Nages] age_ct_adj ;      // correction factor for age vector (bias against younger adults)
 }
 // Section 2. The parameters to be estimated 
 parameters {
   real<lower=0> alpha0 ;                  // base adult log haz (for 10 yr old)
   real<lower=0> alpha1 ;                  // adult log haz age modifier par 1
   real<lower=0> alpha2 ;                  // adult log haz age modifier par 2
-  real<lower=0> nu ;                      // log haz ratio for juv relative to sub-adlt   
+  // real<lower=0> nu ;                   // log haz ratio for juv relative to sub-adlt   
   simplex[NCages] pie[NCobs];             // probs of age counts (for multinomial)
   real<lower=0,upper=4> thta[2];          // theta params: controls "shape" of DD (for Fecundity and survival)
   real<lower=0> phi[2];                   // D-D effects for fecundity (1) and survival (2)
@@ -65,11 +66,10 @@ parameters {
   real<lower=0> gamma_HA_mn;              // Mean Harvest log hazard rate, Adult
   real gamma_H0s[Nyrs-1];                 // Annual harvest log hazard rate, Juvenile (beaters) (stdzd)
   real gamma_HAs[Nyrs-1];                 // Annual harvest log hazard rate, Adults (age 1+) (stdzd)
-  real<lower=0,upper=1> zeta ;            // proportional D-D strength for sub-adults relative to juveniles
+  real<lower=0> zeta ;                    // adjusts proportional D-D strength for adults relative to juveniles
 }
 // Section 3. Additional transformed parameters, including key model dynamics
 transformed parameters {
-  real N0 ;                             // initial abundance (year 1)
   vector[Nyrs-1] epsF;                  // Stochastic effects on fecundity, by year 
   vector[Nyrs-1] epsS;                  // Stochastic effects on juv survival, by year 
   vector[Nyrs-1] gamma_H0;              // Annual harvest log hazard rate, Juvenile (beaters) 
@@ -82,23 +82,28 @@ transformed parameters {
   real<lower=0> S0[Nyrs-1] ;            // Juv Survival from all competing hazards 
   vector<lower=0>[Nages] SA[Nyrs-1];    // Adult Survival from all competing hazards
   real<lower=0> Pups_pred[Nyrs-1] ;     // Predicted pups available for counting, by year  
+  vector<lower=0>[NCages] Avc[Nyrs-1] ; // predicted age vector
   vector<lower=0>[Nyrs-1] H0_pred_ALL ; // predicted harvest numbers by year, pups (including SNL)
   vector<lower=0>[Nyrs-1] HA_pred_ALL ; // predicted harvest numbers by year, adults (age1+) (including SNL)
   vector<lower=0>[Nyrs-1] H0_pred ;     // predicted harvest numbers by year without SnL, pups
   vector<lower=0>[Nyrs-1] HA_pred ;     // predicted harvest numbers by year without SnL, adults
   vector[41] haz_Ice[2] ;               // Hazards associated with ice anomalies, Gulf and front
+  vector[Nages] gamma_D_scale ;         // Scaling factor for adult density dependent log hazards
   // Re-scale and re-center the random effect variables from standardized normal 
-  N0 = N0mil * 1000000 ;
   epsF = to_vector(epsFs) * sigF ;
   epsS = to_vector(epsSs) * sigS ;
   gamma_H0 = to_vector(gamma_H0s) * sigH + gamma_H0_mn;
   gamma_HA = to_vector(gamma_HAs) * sigH + gamma_HA_mn;
   // Initize pop vector  
-  N[1] = N0 ;                     // Initialize population, year 1
+  N[1] = N0mil * 1000000 ;                     // Initialize population, year 1
   n[1] = sad0 * N[1];             // Initialize population vector, year 1
   // Calculate adult and juvenile log hazards (baseline). 
-  gamma_A = alpha0 - alpha1 * agesC + alpha2 * agesC2 ;
-  gamma_0 = alpha0 - alpha1 * agesC[1] + alpha2 * agesC2[1] + nu ;
+  gamma_A = alpha0 - alpha1 * agesC[2:(Nages+1)] + alpha2 * agesC2[2:(Nages+1)] ;
+  gamma_0 = alpha0 - alpha1 * agesC[1] + alpha2 * agesC2[1]  ;
+  // Density depenedent scaling factor (by age) for adults:
+  for(a in 1:Nages){
+    gamma_D_scale[a] = pow((1 / (a + 0.5)), zeta) ;
+  }  
   // Ice hazard functions for Gulf and Front
   haz_Ice[1] = exp(omega + 8 * exp(psi1 - (ICvec * psi2)) ./ (1 + exp(psi1 - (ICvec * psi2)))) ;
   haz_Ice[2] = exp(omega + 8 * exp((psi1-1) - (ICvec * psi2)) ./ (1 + exp((psi1-1) - (ICvec * psi2)))) ;
@@ -114,6 +119,7 @@ transformed parameters {
     real prp_HV_0 ;               // Proportion of mortality comprised of harvest, Juve 
     vector[Nages] prp_HV_A ;      // Proportion of mortality comprised of harvest, Adult
     real gamma_D ;                // density-dependent effect for juveniles/subadults
+    vector[Nages] Age_ppn ;       // proportion of individuals in each age class, bias-adjusted 
     // current N in millions of animals, for D-D calcs
     Nml = N[i]/1000000 ;
     // Annual Fecundity, with D-D, envir. effects and stochasticity 
@@ -128,7 +134,7 @@ transformed parameters {
     haz_H0 = exp(omega + gamma_H0[i]) ; // hazards from bycatch/human harvest of pups/beaters
     S0[i] = exp(-1 * (haz_J + haz_IC + haz_H0)) ;  // combine hazards for Juv survival
     // Adult competing hazards and net survival (allow weak DD effects for sub-adults)
-    haz_A = exp(omega + gamma_A + gamma_D * zeta * (1 ./ ages) ) ; // reg adult hazards 
+    haz_A = exp(omega + gamma_A + gamma_D_scale * gamma_D ) ; // reg adult hazards 
     haz_HA = exp(omega + gamma_HA[i]) ; // harvest/bycatch hazards for adults
     SA[i] = exp(-1 * (haz_A + haz_HA)) ;    
     // Calculate proportional mortality from harvest from pups and adults
@@ -144,6 +150,9 @@ transformed parameters {
     // OPTION: could also subtract some fraction of Ice motality that occurs prior to pup survey: 
     // IceMort = sum((n[i] .* Fc[i])) * 0.5 * Snp[i] * (1 - S0[i]) * (haz_I / (haz_J + haz_I + haz_HVp))
     Pups_pred[i] = sum((n[i] .* Fc[i])) * 0.5 * Snp[i] ; // optionally subtract proportion of IceMort
+    // Calculate age comp vector, adjusting for bias against observing younger animals 
+    Age_ppn = ( (n[i] .* age_ct_adj) / sum(n[i]  .* age_ct_adj)) ;
+    Avc[i] = Age_ppn[NCage1:Nages] ;    
     // Update population vector and total abundance for next year
     n[i+1][1] = sum((n[i] .* Fc[i])) * 0.5 * Snp[i] * S0[i] ;
     n[i+1][2:(Nages-1)] = n[i][1:(Nages-2)] .* SA[i][1:(Nages-2)] ;
@@ -162,7 +171,7 @@ model {
   //  Ageclass distributions by year (multinomial dist)
   for(i in 1:NCobs){
     // NOTE: Use dirichlet-multinomial to handle error/variance in age counts 
-    pie[i] ~ dirichlet(10 * tau * (n[YrAGsmp[i]][NCage1:Nages] / sum(n[YrAGsmp[i]][NCage1:Nages])));
+    pie[i] ~ dirichlet(10 * tau * Avc[YrAGsmp[i]]);
     Agects[i,] ~ multinomial(pie[i]) ;
   }
   //  Pregancy status of females by age/year (beta-binomial dist)
@@ -176,7 +185,7 @@ model {
   gamma_H0s ~ normal(0,1);            // Annual pup harvest log hazards (stdzd)
   gamma_HAs ~ normal(0,1);            // Annual adult harvest log hazards (stdzd)
   // Base parameter priors:
-  N0mil ~ normal(2,1) ; 
+  N0mil ~ normal(2.5,.5) ; 
   thta ~ gamma(5,4) ;
   phi ~ normal(0,1) ;
   beta1 ~ normal(0,5) ;
@@ -193,11 +202,12 @@ model {
   alpha0 ~ normal(3,1) ;
   alpha1 ~ normal(0,.5) ;
   alpha2 ~ normal(0,0.1) ;
-  nu ~ normal(0,1) ;
-  zeta ~ beta(1,5) ;
+  // nu ~ normal(0,1) ;
+  zeta ~ normal(4,1) ;
 }
 // Section 5. Derived parameters and statistics 
 generated quantities {
+  real N0 ;                           // initial abundance (year 1)
   real PAmean[Nareas] ;               // mean PA values
   real Fc8_prdct[Nyrs-1] ;            // Predicted fecundity rate for 8+ over years
   vector[Nages] Fc1966_prdct ;        // Predicted fecundity rate for all ages, 1966
@@ -223,15 +233,16 @@ generated quantities {
   real ppp2 ;                         // Posterior predictive check Bayesian P-value
   real ppp ;                          // Posterior predictive check Bayesian P-value
   int<lower=0> c;
+  N0 = N[2] * (N[2]/N[3]) ;  
   for (i in 1:(Nyrs-1)){
     Fc8_prdct[i] = Fc[i][8] ;
   }
   Fc1966_prdct = Fc[16][1:Nages];
   Fc2016_prdct = Fc[66][1:Nages];
-  SA_ld = exp(-1 * (exp(omega + gamma_A + pow(phi[2]*2,thta[2]) * zeta * (1 ./ ages)) +  exp(omega))) ;
-  S0_ld =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*2, thta[2])) + haz_Ice[1][21] + exp(omega) )) ;
-  SA_hd = exp(-1 * (exp(omega + gamma_A + pow(phi[2]*6,thta[2]) * zeta * (1 ./ ages)) +  exp(omega))) ;
-  S0_hd =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*6, thta[2])) + haz_Ice[1][21] + exp(omega) )) ;
+  S0_ld =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*1.67, thta[2])) + haz_Ice[1][21] + exp(omega) )) ;
+  S0_hd =  exp(-1 * (exp(omega + gamma_0 + pow(phi[2]*5, thta[2])) + haz_Ice[1][21] + exp(omega) )) ;
+  SA_ld = exp(-1 * (exp(omega + gamma_A + pow(phi[2]*1.67,thta[2]) * gamma_D_scale) +  exp(omega))) ;
+  SA_hd = exp(-1 * (exp(omega + gamma_A + pow(phi[2]*5,thta[2]) * gamma_D_scale) +  exp(omega))) ;
   c = 0 ;
   for (i in 1:NPcts){
     c = c+1 ;

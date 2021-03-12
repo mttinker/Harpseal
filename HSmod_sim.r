@@ -149,7 +149,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       haz_H0 = exp(omega + gamma_H0[i]) 
       S0[i] = exp(-1 * (haz_0 + haz_I + haz_H0)) 
       #  Adult competing hazards and net realized survival
-      haz_A = exp(omega + gamma_A + zeta*((phiS*Nml[i])^thtaS)*(1/ages) )
+      haz_A = exp(omega + gamma_A + ((phiS*Nml[i])^thtaS)*(1/(ages + 0.5))^zeta)
       haz_HA = exp(omega + gamma_HA[i]) 
       SA[,i] = exp(-1 * (haz_A + haz_HA))     
       #  Calculations for proportional mortality from harvest
@@ -157,18 +157,20 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       prp_HV_0 = haz_H0 / (haz_0 + haz_I + haz_H0) 
       HV0_pred[i] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (1 - S0[i]) * prp_HV_0 
       if (futuresim==0){
-        HV0_pred[i] =  HV0_pred[i] -0.1*HV0_pred[i]
+        HV0_pred[i] =  HV0_pred[i] * .9
       }      
       if (futuresim==2){
-        HV0_pred[i] = HV0_pred[i] - (Grn_P+Arc_P+Byc_P)
+        HV0_can = HV0_pred[i] - Grn_P*runif(1,.9,1.1)*(1/.5) - Arc_P*runif(1,.95,1.05)*(1/.5) - Byc_P*runif(1,.7,1.3)
+        HV0_pred[i] = HV0_can * .95
       }
       prp_HV_A = haz_HA / (haz_A + haz_HA) 
       HVA_pred[i] = sum((n[,i] * (1 - SA[,i])) * prp_HV_A) 
       if (futuresim==0){
-        HVA_pred[i] =  HVA_pred[i] -0.5*HVA_pred[i]
+        HVA_pred[i] =  HVA_pred[i] * .5
       }
       if (futuresim==2){
-        HVA_pred[i] = HVA_pred[i] - (Grn_A+Arc_A+Byc_A)
+        HVA_can = HVA_pred[i] - Grn_A*runif(1,.9,1.1)*(1/.5) - Arc_A*runif(1,.95,1.05)*(1/.5) - Byc_A*runif(1,.7,1.3)
+        HVA_pred[i] = HVA_can * .5
       }    
       #  Annual demographic transitions
       nt1[1] = sum((n[,i] * Fc[,i]) * 0.5 * npsv) * (S0[i])
