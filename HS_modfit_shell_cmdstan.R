@@ -6,7 +6,7 @@
 #
 # Specify year range of time series for model fitting 
 Year1 = 1951   #  Year1 = first year that harvest data available
-YearT = 2020   #  YearT = year AFTER last available data for fitting
+YearT = 2020   #  YearT = year AFTER last available data for fitting (harvest/repro data)
 Nareas = 3     # Number pupping areas (assume 3: S.GSL, N.GSL, Front)  
 # Prior for Initial Population size year 1 (model uses weak prior):
 N0pri = 2.5  # prior guess of starting pop size, in millions

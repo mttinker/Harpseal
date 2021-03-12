@@ -750,7 +750,7 @@ print(plt_N_Kest)
 
 ```{r Table3, echo=FALSE}
 
-Ktab1 = data.frame(Metric = "Current abundance", 
+Ktab1 = data.frame(Metric = paste0("Estimated abundance, ", max(Year)), 
                   Mean = dp1$N2exp[Nyrs-2]/1000000, 
                   SD = dp1$N_sd[Nyrs-2]/1000000, 
                   CI95_low=dp1$N2_lo[Nyrs-2]/1000000,
