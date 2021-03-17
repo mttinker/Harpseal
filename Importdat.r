@@ -1,8 +1,8 @@
 # Import data
 require(readxl)
 df.sad = read_excel("./data/SAD0_36.xlsx")
-# CE index
-df.CE = read_excel("./data/CE_index.xlsx")
+# CI index
+df.NLCI = read_excel("./data/NL_climate_index.xlsx")
 # Ice Anomalies
 df.Ice = read_excel("./data/IceAnom.xlsx")
 # Removals (harvest)

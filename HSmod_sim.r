@@ -37,7 +37,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
   # Process variables and set up arrays for simulations
   if(nrow(IC)==1000){
     ICr = IC
-    CEr = CE    
+    CIr = CI    
   }
   if (futuresim==2){
     # random multipliers for harvest hazards,
@@ -78,7 +78,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     # Initialize variables
     if(nrow(IC)==1000){
       IC = ICr[sample(1000,Nyrs,replace = T),]
-      CE = CEr[sample(1000,Nyrs,replace = T)]
+      CI = CIr[sample(1000,Nyrs,replace = T)]
     }
     N = numeric(length = Nyrs)
     Nml = numeric(length = Nyrs)
@@ -96,16 +96,22 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     # Harvest mort: depends on type of scenario
     if(futuresim==0){
       # Increased stochasticity to mimic effects of autocorrelation
-      epsF = rnorm(Nyrs-1,0,1.5*sigF) + .3
-      epsS = rnorm(Nyrs-1,0,1.5*sigS) - .3   
+      epsF = rnorm(Nyrs-1,0,2*sigF) + .5
+      epsS = rnorm(Nyrs-1,0,2*sigS) - .5    
       # Level of harvest as observed
       gamma_H0 = gamma_H0
       gamma_HA = gamma_HA
     }else if(futuresim==1){
+      # Increased stochasticity to mimic effects of autocorrelation
+      epsF = rnorm(Nyrs-1,0,1.5*sigF) + .5
+      epsS = rnorm(Nyrs-1,0,1.5*sigS) - .5         
       # No harvest hazards (for estimating K)
       gamma_H0 = rep(0,Nyrs-1)
       gamma_HA = rep(0,Nyrs-1)
     }else if(futuresim==2){
+      # Increased stochasticity to mimic effects of autocorrelation
+      epsF = rnorm(Nyrs-1,0,1.5*sigF) + .5
+      epsS = rnorm(Nyrs-1,0,1.5*sigS) - .5   
       # Range of harvest levels, for finding TAC criteria
       # (then harvest rate remains constant for years within a sim)
       gamma_H0 = rep(gamma_H0_mn*ig1[r],Nyrs-1)
@@ -117,6 +123,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     }
     N[1] = N0pri 
     Nml[1] = N[1]/1000000 
+    gamma_D_scale = (1/(ages + 0.5))^zeta
     # Loop through years to calculate demographic transitions and population dynamics 
     for (ix in 1:length(iy)){
       # npsv = 1-(gtools::inv.logit(rnorm(1,0,1))/10) 
@@ -137,10 +144,11 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       nt1 = numeric(length = Nages)
       #  Fecundity (compared with observed pregnancy rate: adjust for abortions?)
       Fc[1:3,i] = rep(0,3) 
-      Fc[4:8,i] = gtools::inv.logit(beta1 - beta2 * (8-ages[4:8])^2 - (phiF*Nml[i])^thtaF + dlta*CE[i]*(Nml[i]) + epsF[i])
+      Fc[4:8,i] = gtools::inv.logit(beta1 - beta2 * (8-ages[4:8])^2 - (phiF*Nml[i])^thtaF - dlta[1]*CI[i]*(Nml[i]) + epsF[i])
       Fc[9:Nages,i] = rep(Fc[8,i],(Nages-8)) 
       #  Juvenile competing hazards and net realized survival
-      haz_0 = exp(omega + gamma_0 + (phiS*Nml[i])^thtaS + epsS[i]) ; #  + epsJ[i]
+      gamma_D = (phiS*Nml[i])^thtaS 
+      haz_0 = exp(omega + gamma_0 + gamma_D + dlta[2] * CI[i+1] + epsS[i]) ; #  + epsJ[i]
       for(a in 1:Nareas){ 
         gamma_I[a] = 8 * exp((psi1+psiadj[a]) - (IC[i,a] * psi2)) / (1 + exp((psi1+psiadj[a]) - (IC[i,a] * psi2))) 
         haz_I_A[a] = exp(omega + gamma_I[a]) 
@@ -149,7 +157,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       haz_H0 = exp(omega + gamma_H0[i]) 
       S0[i] = exp(-1 * (haz_0 + haz_I + haz_H0)) 
       #  Adult competing hazards and net realized survival
-      haz_A = exp(omega + gamma_A + ((phiS*Nml[i])^thtaS)*(1/(ages + 0.5))^zeta)
+      haz_A = exp(omega + gamma_A + gamma_D * gamma_D_scale)
       haz_HA = exp(omega + gamma_HA[i]) 
       SA[,i] = exp(-1 * (haz_A + haz_HA))     
       #  Calculations for proportional mortality from harvest

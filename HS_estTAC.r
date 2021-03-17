@@ -44,7 +44,7 @@ init_fun <- function(rr) {list(
   thtaS = mcmc[rr,vn=="thta[2]"],
   psi1 = mcmc[rr,vn=="psi1"],
   psi2 = mcmc[rr,vn=="psi2"],
-  dlta = mcmc[rr,vn=="dlta"],
+  dlta = mcmc[rr,startsWith(vn,"dlta[")],
   zeta = mcmc[rr,vn=="zeta"],
   gamma_H0_mn = mcmc[rr,vn=="gamma_H0_mn"],
   gamma_HA_mn = mcmc[rr,vn=="gamma_HA_mn"],
@@ -63,11 +63,11 @@ Yearst2=Year1
 Nyrs2=Nyrs
 N_end = sumstats[vns=="N0",1]
 IC2=IC
-CE2=CE
+CI2=CI
 sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,r_vec=r_vec,
                  PAmeans=PAmeans,futuresim=futuresim,
                  NCages=NCages,NCage1=NCage1,Nages=Nages,Nareas=Nareas,
-                 ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,
+                 ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CI=CI2,
                  omega=omega,Grn_A=Grn_A,Grn_P=Grn_P,Arc_A=Arc_A,Arc_P=Arc_P,
                  Byc_A=Byc_A,Byc_P=Byc_P) 
 # Run sims:
@@ -98,12 +98,12 @@ SAD0 = as.data.frame(rslt$SAD)
 futuresim = 1; # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
 Nyrs2 = 100; Yearst2 = 2021 ; 
 N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]  
-# Future conditions: based on ice and CE indices from after year YY, 
+# Future conditions: based on ice and CI indices from after year YY, 
 #  fit appropriate random sampling distributions
 YY = 2000
-ii = which(df.CE$Year>=YY)
-ft = fitdist(log(df.CE$CEindex[ii])+1,"gamma")
-CE2 = rgamma(1000,coef(ft)[1],coef(ft)[2])-1
+ii = which(df.NLCI$Year>=1951)
+ft = fitdist(df.NLCI$CI[ii],"norm")
+CI2 = rnorm(1000,coef(ft)[1],coef(ft)[2])
 ii = which(df.Ice$Year>=YY)
 ft = fitdist(exp(df.Ice$Gulf_Anom[ii]),"norm")
 icg1 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
@@ -114,7 +114,7 @@ IC2 = as.matrix(cbind(icg1,icg1,icg2))
 sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,r_vec=r_vec,
                  PAmeans=PAmeans,futuresim=futuresim,
                  NCages=NCages,NCage1=NCage1,Nages=Nages,Nareas=Nareas,
-                 ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,
+                 ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CI=CI2,
                  omega=omega,Grn_A=Grn_A,Grn_P=Grn_P,Arc_A=Arc_A,Arc_P=Arc_P,
                  Byc_A=Byc_A,Byc_P=Byc_P) 
 # Run sims:
@@ -153,7 +153,7 @@ print(plt_N_Kest)
 # Set up sims for 15 years under varying harvest levels
 futuresim = 2 # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
 Nyrs2 = 15; Yearst2 = 2021 ; 
-# Future ice/env conditions: same as for K sime abive
+# Future ice/env conditions: same as for K sims above
 #
 N_ad = sumstats[which(startsWith(vns,"N[")),1]
 N_all = N_ad[1:(Nyrs-1)] + sumstats[startsWith(vns,"Pups_pred[")==T,1]
@@ -167,7 +167,7 @@ N50P = N50/8000000
 sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,r_vec=r_vec,
                  PAmeans=PAmeans,futuresim=futuresim,
                  NCages=NCages,NCage1=NCage1,Nages=Nages,Nareas=Nareas,
-                 ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,
+                 ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CI=CI2,
                  omega=omega,Grn_A=Grn_A,Grn_P=Grn_P,Arc_A=Arc_A,Arc_P=Arc_P,
                  Byc_A=Byc_A,Byc_P=Byc_P) 
 # Run sims:
@@ -262,6 +262,8 @@ TACtab = data.frame(Pcnt_adlt=c(5,10,50),
                     TAC_N70 = c(TACN70pa05,TACN70pa10,TACN70pa50),
                     TAC_N50 =c(TACN50pa05,TACN50pa10,TACN50pa50))
 print(TACtab)
+
+# Save results ---------------------------------------------------------------
 save(file = "TAC_K_est.rdata",Kest,Kest_CI,SAD0,
      TACtab,Ktab,dpN_HCst,dpN_K,dat_N_Hv,plt_N_hindcast,plt_N_Kest)
 #

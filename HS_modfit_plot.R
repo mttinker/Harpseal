@@ -17,6 +17,7 @@ require(bayesplot)
 library(foreach)
 library(doParallel)
 library(doRNG)
+library(gridExtra)
 Year = seq(Year1,Year1+Nyrs-2)
 Yearp = seq(Year1,Year1+Nyrs-1)
 # Diagnostics -----------------------------------------------
@@ -269,21 +270,75 @@ pl9 = ggplot(data=dp9,aes(x=Age,y=Survival,group=Density,fill=Density)) +
 print(pl9)
 #
 # Ice anomaly effect on pup survival---------------------------------------
-dp10 = data.frame(Ice_Anomaly = ICvec)
+dp10 = data.frame(Ice_Anomaly = ICvec,Area = "Gulf")
 dp10$Haz = sumstats[which(startsWith(vns,"haz_Ice[1")),1]
 dp10$Haz_lo = sumstats[which(startsWith(vns,"haz_Ice[1")),4]
 dp10$Haz_hi = sumstats[which(startsWith(vns,"haz_Ice[1")),8]
 dp10$SvIce = exp(-1 * (dp10$Haz))
 dp10$SvIce_lo = exp(-1 * (dp10$Haz_hi))
 dp10$SvIce_hi = exp(-1 * (dp10$Haz_lo))
-pl10 = ggplot(dp10,aes(x=Ice_Anomaly,y=SvIce)) +
-  geom_ribbon(aes(ymin=SvIce_lo,ymax=SvIce_hi),alpha=0.3) +
-  geom_line() + geom_vline(xintercept = 0) +
-  labs(x="Ice Anomaly (deviation from 1969-2000 mean cover)",y="Pup survival from ice hazards") +
-  ggtitle("Effect of ice cover on pup survival (Gulf)") +
+tmp = data.frame(Ice_Anomaly = ICvec,Area = "Front")
+tmp$Haz = sumstats[which(startsWith(vns,"haz_Ice[2")),1]
+tmp$Haz_lo = sumstats[which(startsWith(vns,"haz_Ice[2")),4]
+tmp$Haz_hi = sumstats[which(startsWith(vns,"haz_Ice[2")),8]
+tmp$SvIce = exp(-1 * (tmp$Haz))
+tmp$SvIce_lo = exp(-1 * (tmp$Haz_hi))
+tmp$SvIce_hi = exp(-1 * (tmp$Haz_lo)) 
+dp10 = rbind(dp10,tmp); dp10$Area = factor(dp10$Area, levels=c("Gulf","Front"))
+pl10 = ggplot(dp10,aes(x=Ice_Anomaly,y=SvIce,fill=Area,color=Area)) +
+  geom_ribbon(aes(ymin=SvIce_lo,ymax=SvIce_hi),alpha=0.25) +
+  geom_line() +
+  geom_vline(xintercept = 0) +
+  labs(x="Ice Anomaly (proportional deviation from 1969-2000 mean cover)",y="Pup survival from ice hazards") +
+  ggtitle("Effect of ice cover on pup survival") +
   theme_classic()
 print(pl10)
 #
+# Effects of Climate Index---------------------------------------
+NN = 3.75
+CIvals = seq(-1.5,1.5,by = .1)
+NCIvals = length(CIvals)
+iir = sample(Nsims,1000)
+b0_r = as.numeric(mcmc[iir,vn=="beta1"])
+phiF_r = as.numeric(mcmc[iir,vn=="phi[1]"])
+thtaF_r = as.numeric(mcmc[iir,vn=="thta[1]"])
+phiS_r = as.numeric(mcmc[iir,vn=="phi[2]"])
+thtaS_r = as.numeric(mcmc[iir,vn=="thta[2]"])
+gamma0_r = as.numeric(mcmc[iir,vn=="gamma_0"])
+dlta1_r =  as.numeric(mcmc[iir,vn=="dlta[1]"])
+dlta2_r =  as.numeric(mcmc[iir,vn=="dlta[2]"])
+FC = matrix(0,nrow = 1000,ncol=NCIvals)
+S0 = matrix(0,nrow = 1000,ncol=NCIvals)
+gamD_F = (mean(phiF_r)*NN)^mean(thtaF_r) 
+gamD_S = (mean(phiS_r)*NN)^mean(thtaS_r)
+for(r in 1:1000){
+  FC[r,] = inv.logit(b0_r[r] - (phiF_r[r]*NN)^thtaF_r[r] - dlta1_r[r]*CIvals)
+  hazJ = exp(omega + gamma0_r[r] + (phiS_r[r]*NN)^thtaS_r[r] + dlta2_r[r] * CIvals ) 
+  S0[r,] = exp(-hazJ + 2*exp(omega)) 
+}
+FC_mean = colMeans(FC)
+FC_lo = apply(FC, 2, quantile, prob=0.05)
+FC_hi = apply(FC, 2, quantile, prob=0.95)
+S0_mean = colMeans(S0)
+S0_lo = apply(S0, 2, quantile, prob=0.05)
+S0_hi = apply(S0, 2, quantile, prob=0.95)
+dp11 = data.frame(CI = CIvals, Fecundity = FC_mean,
+                  FC_lo = FC_lo, FC_hi = FC_hi,
+                  Survival = S0_mean,
+                  S0_lo = S0_lo, S0_hi = S0_hi)
+pl11a = ggplot(dp11, aes(x=CI,y=Fecundity)) +
+  geom_ribbon(aes(ymin=FC_lo,ymax=FC_hi),alpha=0.3) +
+  geom_line() + labs(x = "Climate index (CI)",y="Pregnancy rate (8+)") +
+  ggtitle("A) Effect of climate index on adult fecundity") + theme_classic()
+#print(pl11a)
+
+pl11b = ggplot(dp11, aes(x=CI,y=Survival)) +
+  geom_ribbon(aes(ymin=S0_lo,ymax=S0_hi),alpha=0.3) +
+  geom_line() + labs(x = "Climate index (CI)",y="Annual survival, ageclass 0") +
+  ggtitle("B) Effect of climate index on juvenile survival") + theme_classic()
+# print(pl11b)
+
+grid.arrange(pl11a,pl11b)
 # Fecundity vs density ----------------------------------------------------
 NN = seq(.1,6.6,by=0.1)
 lngNN = length(NN)
@@ -299,15 +354,15 @@ for(r in 1:1000){
   FC[r,] = inv.logit(b0_r[r] - (phiF_r[r]*NN)^thtaF_r[r])
 }
 FC_mean = colMeans(FC)
-FC_lo = apply(FC, 2, quantile, prob=0.055)
+FC_lo = apply(FC, 2, quantile, prob=0.05)
 FC_hi = apply(FC, 2, quantile, prob=0.95)
-dp11 = data.frame(Nmil = NN*1.2, Fecundity = FC_mean,
+dp12 = data.frame(Nmil = NN*1.2, Fecundity = FC_mean,
                  FC_lo = FC_lo, FC_hi = FC_hi)
-pl11 = ggplot(dp11, aes(x=Nmil,y=Fecundity)) +
+pl12 = ggplot(dp12, aes(x=Nmil,y=Fecundity)) +
   geom_ribbon(aes(ymin=FC_lo,ymax=FC_hi),alpha=0.3) +
   geom_line() + labs(x = "Abundance (millions)",y="Pregnancy rate (8+)") +
   ggtitle("Density-dependent variation in adult fecundity") + theme_classic()
-print(pl11)
+print(pl12)
 #
 # Juvenile survival vs density --------------------------------------------
 NN = seq(.1,6.6,by=0.1)
@@ -323,14 +378,14 @@ for(r in 1:1000){
 S0_mean = colMeans(S0)
 S0_lo = apply(S0, 2, quantile, prob=0.05)
 S0_hi = apply(S0, 2, quantile, prob=0.95)
-dp12 = data.frame(Nmil = NN*1.2, S0_mean = S0_mean,
+dp13 = data.frame(Nmil = NN*1.2, S0_mean = S0_mean,
                  S0_lo = S0_lo, S0_hi = S0_hi)
-pl12 = ggplot(dp12, aes(x=Nmil,y=S0_mean)) +
+pl13 = ggplot(dp13, aes(x=Nmil,y=S0_mean)) +
   geom_ribbon(aes(ymin=S0_lo,ymax=S0_hi),alpha=0.3) +
   xlim(0,8) +
   geom_line() + labs(x = "Abundance (millions)",y="Juvenile survival rate") +
   ggtitle("Density-dependent variation in juvenile survival") + theme_classic()
-print(pl12)
+print(pl13)
 #
 # Evaluate model sims-----------------------------------------------------
 # Simulate future data with or without harvest mort
@@ -346,13 +401,13 @@ if(futuresim==0){
   Nyrs2=Nyrs
   N_end = sumstats[vns=="N0",1]
   IC2=IC
-  CE2=CE
+  CI2=CI
 }else{
   N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]  
   YY = 2000
-  ii = which(df.CE$Year>=YY)
-  ft = fitdist(log(df.CE$CEindex[ii])+1,"gamma")
-  CE2 = rgamma(1000,coef(ft)[1],coef(ft)[2])-1
+  ii = which(df.NLCI$Year>=YY)
+  ft = fitdist(df.NLCI$CI[ii],"normal")
+  CI2 = rnorm(1000,coef(ft)[1],coef(ft)[2])
   ii = which(df.Ice$Year>=YY)
   ft = fitdist(exp(df.Ice$Gulf_Anom[ii]),"norm")
   icg1 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
@@ -373,7 +428,7 @@ Byc_P = .8*Byctc
 sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,r_vec=r_vec,
                   PAmeans=PAmeans,futuresim=futuresim,
                   NCages=NCages,NCage1=NCage1,Nages=Nages,Nareas=Nareas,
-                  ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CE=CE2,
+                  ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CI=CI2,
                   omega=omega,Grn_A=Grn_A,Grn_P=Grn_P,Arc_A=Arc_A,Arc_P=Arc_P,
                   Byc_A=Byc_A,Byc_P=Byc_P) 
 init_fun <- function(rr) {list(
@@ -390,7 +445,7 @@ init_fun <- function(rr) {list(
   thtaS = mcmc[rr,vn=="thta[2]"],
   psi1 = mcmc[rr,vn=="psi1"],
   psi2 = mcmc[rr,vn=="psi2"],
-  dlta = mcmc[rr,vn=="dlta"],
+  dlta = mcmc[rr,startsWith(vn,"dlta[")],
   zeta = mcmc[rr,vn=="zeta"],
   gamma_H0_mn = mcmc[rr,vn=="gamma_H0_mn"],
   gamma_HA_mn = mcmc[rr,vn=="gamma_HA_mn"],

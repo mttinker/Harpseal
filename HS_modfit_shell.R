@@ -13,7 +13,7 @@ N0pri = 2.5  # prior guess of starting pop size, in millions
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1 
 # Youngest adult age class to consider for age composition fitting
-NCage1 = 3; # Note that ages <7 are adjusted for negative sampling bias
+NCage1 = 3; # Note recommend 3, that ages <7 are adjusted for negative sampling bias
 # Age_bias_adj represents the increment in proportion missed for each year younger than 7
 Age_bias_adj = 0.1 # value of 0.1 means 10% missed for 6yr-olds, 20% missed for 5yr-olds...
 # Suggested Prior means 
@@ -99,7 +99,7 @@ Ice_mort_plot(psipri1,1,psipri2,1)
 #
 # Create data inputs for observed harvest, environmental CE index and ice anomalies
 IC = matrix(0,nrow = Nyrs, ncol = 3)
-CE = numeric(length = Nyrs)
+CI = numeric(length = Nyrs)
 H_0 = numeric(length = (Nyrs-1))
 H_A = numeric(length = (Nyrs-1))
 Q_0 = numeric(length = (Nyrs-1))
@@ -111,9 +111,9 @@ for (y in 1:Nyrs){
     IC[y,2] = df.Ice$Gulf_Anom[ii]
     IC[y,3] = df.Ice$Lab_Anom[ii]
   }
-  ii = which(df.CE$Year==Yr0+y)
+  ii = which(df.NLCI$Year==Yr0+y)
   if(length(ii)==1){
-    CE[y] = log(df.CE$CEindex[ii])
+    CI[y] = df.NLCI$CI[ii]  
   }
   ii = which(df.HV$YEAR==Yr0+y)
   if(length(ii)==1 & y<Nyrs){
@@ -123,6 +123,8 @@ for (y in 1:Nyrs){
     Q_0[y] = df.HV$PUP_prob_rec[ii]
   }
 }
+# Shift CI to account for lag 
+CI = c(CI[1], CI)
 # Create a "dummy vector" of ice anomaly values from -1 to 1 (step size 0.05), 
 #  and discretized version of IC anomaly values classified to units of 0.05 
 #  (to speed up fitting)
@@ -141,7 +143,7 @@ rm(i,ii,y,aa)
 #  
 stan.data <- list(NPcts=NPcts,NCages=NCages,NCage1=NCage1,NCobs=NCobs,
                   NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
-                  ages=ages,agesC=agesC,agesC2=agesC2,sad0=sad0,IC=ICcat,CE=CE,
+                  ages=ages,agesC=agesC,agesC2=agesC2,sad0=sad0,IC=ICcat,CI=CI,
                   Pups=Pups,PA=PA,sdNP=sdNP,Agects=Agects,NFsamp=NFsamp,NPrg=NPrg,
                   YrPct=YrPct,PAidx=PAidx,YrAGsmp=YrAGsmp,H_0=H_0,H_A=H_A,
                   YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp,psipri1=psipri1,psipri2=psipri2,
@@ -199,7 +201,7 @@ out <- stan(
   cores = ncore,           # number of available cores 
   refresh = 100,           # show progress every 'refresh' iterations
   # increase adapt_delta and max_treedepth to help find optimal vals
-  control = list(adapt_delta = 0.8, max_treedepth = 10) 
+  control = list(adapt_delta = 0.9, max_treedepth = 12) 
 )
 #
 # generate summary stats (sumstats, mcmc matrix)
