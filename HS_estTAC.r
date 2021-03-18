@@ -4,7 +4,7 @@
 #
 rm(list = ls())
 # USER-SET PARAMETERS:
-reps = 5000     # number of simulation reps to use (1000 for fast, 10000 for precise)
+reps = 10000     # number of simulation reps to use (1000 for fast, 10000 for precise)
 PAmeans = c(.18,.07,.75) # future expected proportion of pups in S Gulf, N Gulf, Front
 # Specify year ranges to use to parameterize future conditions for ice and climate
 Y1_ice = 2000    # first year of ice cover time series to use to parameterize future sims
@@ -81,7 +81,6 @@ set.seed(123)
 # r_vec = matrix(0,nrow = reps, ncol = 2)
 r_vec = sample(nrow(mcmc),reps,replace = T)
 r_vec2 = sample(1000,reps,replace = T)
-r_vec = matrix(c(),)
 PAr = rdirichlet(1000+Nyrs2, 25*PAmeans)
 epsFr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
 epsSr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
@@ -173,9 +172,9 @@ Ktab = data.frame(Metric = "Equilibrium abundance",
 print(Ktab)
 # Plot
 dpN_K = data.frame(Year = Yearp2, 
-                    N_pred_mean = smooth.spline(apply(Np_Predict, 1, mean),spar=.5)$y /1000000,
-                    N_pred_lo = smooth.spline(apply(Np_Predict,1,quantile,prob=0.1),spar=.5)$y /1000000,
-                    N_pred_hi = smooth.spline(apply(Np_Predict,1,quantile,prob=0.9),spar=.5)$y /1000000 )
+                    N_pred_mean = smooth.spline(apply(Np_Predict, 1, mean),spar=.1)$y /1000000,
+                    N_pred_lo = smooth.spline(apply(Np_Predict,1,quantile,prob=0.1),spar=.1)$y /1000000,
+                    N_pred_hi = smooth.spline(apply(Np_Predict,1,quantile,prob=0.9),spar=.1)$y /1000000 )
 titletxt = "Model projected abundance with zero harvest (including pups)"
 subtxt =  paste0("Estimated long-term equilibrium (K) = ", format(Kest/1000000,digits = 3),
                  "million (CI95 = ", format(Kest_CI[1]/1000000,digits = 3),
@@ -192,6 +191,7 @@ print(plt_N_Kest)
 # Set up sims for 15 years under varying harvest levels
 futuresim = 2 # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
 Nyrs2 = 15; Yearst2 = YearT+1 ; 
+N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]  
 #
 reps2 = reps*10
 set.seed(123)
@@ -201,8 +201,8 @@ r_vec2 = sample(1000,reps2,replace = T)
 PAr = rdirichlet(1000+Nyrs2, 25*PAmeans)
 epsFr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
 epsSr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
-ig1 = runif(reps2,.1,1.5)
-ig2 = runif(reps2,.01,1.2)
+ig1 = runif(reps2,.1,1.2)
+ig2 = runif(reps2,.2,1.5)
 # source("HSmod_sim.r")
 # Future conditions: based on ice and CI indices from specified year range, 
 #  fit appropriate random sampling distributions
@@ -246,13 +246,13 @@ Hva_k = apply(Hva,2,mean)/1000
 ii = which(Hvp_k>0 & Hva_k>0)
 HvT = Hvp_k[ii]+Hva_k[ii]
 ppA = Hva_k[ii]/HvT
-# Nmin = apply(Np_Predict,2,quantile,prob=0.025); Nmin = Nmin[ii]
-Nmin = apply(Np_Predict,2,min); Nmin = Nmin[ii]
+Nmin = apply(Np_Predict,2,quantile,prob=0.05); Nmin = Nmin[ii]
+# Nmin = apply(Np_Predict,2,min); Nmin = Nmin[ii]
 # Convert to 0-1 for betareg
 NminP = Nmin / 8000000
 dat_N_Hv = data.frame(Nmin=NminP,HvT=HvT,HvT2 = HvT*HvT,ppA=ppA,ppA2=ppA*ppA,intx = HvT*ppA)
 # GLM model - convert to 0-1 distribtion and use beta regression 
-fit = betareg(Nmin~ HvT+HvT2+ppA+ppA2+intx,data=dat_N_Hv,link = "logit")
+fit = betareg(NminP ~ HvT+HvT2+ppA+ppA2+intx,data=dat_N_Hv,link = "logit")
 summary(fit)
 #
 HvTeval05 = seq(1,1200)
@@ -284,7 +284,7 @@ ggplot(pred05ad,aes(x=HvT,y=Fitted)) +
        title="Harvest impacts on futue abundance, 5% adults") +
   geom_point(data=dat_N_Hv[which(dat_N_Hv$ppA>0.03 & dat_N_Hv$ppA<0.07),],
              aes(x=HvT,y=Nmin*8000000)) +
-  xlim(0,500) + ylim(0,8000000) +
+  xlim(0,750) + ylim(0,8000000) +
   theme_classic()
 
 ggplot(pred10ad,aes(x=HvT,y=Fitted)) +
@@ -310,18 +310,22 @@ ggplot(pred50ad,aes(x=HvT,y=Fitted)) +
 rndint = 1
 ii = which(abs(pred05ad$Lower-(N70+1000))==min(abs(pred05ad$Lower-(N70+1000))))
 TACN70pa05 = floor(HvTeval05[ii]/rndint)*rndint  
+TACN70pa05 = max(10,TACN70pa05)
 ii = which(abs(pred05ad$Lower-(N50+1000))==min(abs(pred05ad$Lower-(N50+1000))))
 TACN50pa05 = floor(HvTeval05[ii]/rndint)*rndint 
+TACN50pa05 = max(10,TACN50pa05)
 ii = which(abs(pred10ad$Lower-(N70+1000))==min(abs(pred10ad$Lower-(N70+1000))))
 TACN70pa10 = floor(HvTeval10[ii]/rndint)*rndint  
+TACN70pa10 = max(7, min(TACN70pa10,TACN70pa05-1))
 ii = which(abs(pred10ad$Lower-(N50+1000))==min(abs(pred10ad$Lower-(N50+1000))))
 TACN50pa10 = floor(HvTeval10[ii]/rndint)*rndint  
+TACN50pa10 = max(7, min(TACN50pa10,TACN50pa05-1))
 ii = which(abs(pred50ad$Lower-(N70+1000))==min(abs(pred50ad$Lower-(N70+1000))))
 TACN70pa50 = floor(HvTeval50[ii]/rndint)*rndint  
-TACN70pa50 = min(TACN70pa50,TACN70pa10-5)
+TACN70pa50 = max(5, min(TACN70pa50,TACN70pa10-1))
 ii = which(abs(pred50ad$Lower-(N50+1000))==min(abs(pred50ad$Lower-(N50+1000))))
 TACN50pa50 = floor(HvTeval50[ii]/rndint)*rndint  
-TACN50pa50 = min(TACN50pa50,TACN50pa10-5)
+TACN50pa50 = max(5, min(TACN50pa50,TACN50pa10-1))
 # 
 # Create table of TAC recomendations
 TACtab = data.frame(Pcnt_adlt=c(5,10,50),

@@ -776,8 +776,8 @@ As an additional posterior predictive check of model goodness-of-fit, we used Mo
 
 ```{r Fig15, echo=FALSE, warning=FALSE}
 load("TAC_K_est.rdata")
-titletxt = "Figure 15: Hindcast stochastic simulations of abundance, observed harvest"
-subtxt = " (red line = actual model estimate of abundance) "
+titletxt = "Figure 15: Hindcast 'out-of-sample' stochastic simulations"
+subtxt = "  Note: harvest, CI and IC levels as-observed, red line = model-estimated abundance) "
 plt_N_hindcast = ggplot(data=dpN_HCst,aes(x=Year,y=N_pred_mean)) +
   geom_ribbon(aes(ymin=N_pred_lo,ymax=N_pred_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Projected abundance") +
@@ -796,7 +796,7 @@ A similar Monte Carlo simulation approach provided recommended TAC values under 
 <br/>
 
 ```{r Fig16, echo=FALSE, warning=FALSE}
-titletxt = "Figure 16: Model projected abundance with zero harvest (including pups)"
+titletxt = "Figure 16: Model projected abundance with no human-caused mortality"
 subtxt =  paste0("Estimated long-term equilibrium (K) = ", format(Kest/1000000,digits = 3),
                  "million (CI95 = ", format(Kest_CI[1]/1000000,digits = 3),
                  " - ", format(Kest_CI[2]/1000000,digits = 3),")")

@@ -98,25 +98,18 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     FmAgeVec = array(dim = c(NCages,Nyrs-1))
     PredPup = numeric(length = Nyrs-1)
     PredPupA = array(dim = c(Nareas,Nyrs-1))
+    epsF = epsFr[rrr,]*as.numeric(sigF) 
+    epsS = epsSr[rrr,]*as.numeric(sigS)     
     # Harvest mort: depends on type of scenario
     if(futuresim==0){
-      # Increased stochasticity to mimic effects of autocorrelation
-      epsF = epsFr[rrr,]*as.numeric(sigF)*2 + .5 
-      epsS = epsSr[rrr,]*as.numeric(sigS)*2 - .5
       # Level of harvest as observed
       gamma_H0 = gamma_H0
       gamma_HA = gamma_HA
     }else if(futuresim==1){
-      # Increased stochasticity to mimic effects of autocorrelation
-      epsF = epsFr[rrr,]*as.numeric(sigF)*2 + .5 
-      epsS = epsSr[rrr,]*as.numeric(sigS)*2 - .5 
       # No harvest hazards (for estimating K)
       gamma_H0 = rep(0,Nyrs-1)
       gamma_HA = rep(0,Nyrs-1)
     }else if(futuresim==2){
-      # Increased stochasticity to mimic effects of autocorrelation
-      epsF = epsFr[rrr,]*as.numeric(sigF)
-      epsS = epsSr[rrr,]*as.numeric(sigS)
       # Range of harvest levels, for finding TAC criteria
       # (then harvest rate remains constant for years within a sim)
       gamma_H0 = rep(gamma_H0_mn*ig1[r],Nyrs-1)
