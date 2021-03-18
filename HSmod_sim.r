@@ -33,13 +33,13 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     ##now create a new variable with the original name of the list item
     eval(parse(text=paste(names(sim.data)[[i]],"= tempobj")))
   }
-  set.seed(123)
-  r_vec2 = sample(1000,reps,replace = T)
-  PAr = gtools::rdirichlet(1000+Nyrs, 25*PAmeans)
-  epsFr = matrix(rnorm(1000*Nyrs,0,1),nrow=1000)
-  epsSr = matrix(rnorm(1000*Nyrs,0,1),nrow=1000)
-  ig1 = runif(reps,.3,1.5)
-  ig2 = runif(reps,.05,1.2)
+  # set.seed(123)
+  # r_vec2 = sample(1000,reps,replace = T)
+  # PAr = gtools::rdirichlet(1000+Nyrs, 25*PAmeans)
+  # epsFr = matrix(rnorm(1000*Nyrs,0,1),nrow=1000)
+  # epsSr = matrix(rnorm(1000*Nyrs,0,1),nrow=1000)
+  # ig1 = runif(reps,.3,1.5)
+  # ig2 = runif(reps,.05,1.2)
   # Process variables and set up arrays for simulations
   if(nrow(IC)==1000){
     ICr = rbind(IC,IC[1:Nyrs,])  
@@ -68,8 +68,8 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
   sadmean = array(dim = c(Nages,1))
   #
   # Loop through random iterations of model
-  #  using Parallel processing to speed things up
-  simresults = foreach(r=1:reps) %dorng% {
+  #  using Parallel processing to speed things up: try dopar
+  simresults = foreach(r = 1:reps) %dopar% {
     mcmc = mcmc1
     vn = vn1
     rr = r_vec[r]
@@ -115,8 +115,8 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       gamma_HA = rep(0,Nyrs-1)
     }else if(futuresim==2){
       # Increased stochasticity to mimic effects of autocorrelation
-      epsF = epsFr[rrr,]*as.numeric(sigF)*1.25 + .25 
-      epsS = epsSr[rrr,]*as.numeric(sigS)*1.25 - .25      
+      epsF = epsFr[rrr,]*as.numeric(sigF)
+      epsS = epsSr[rrr,]*as.numeric(sigS)
       # Range of harvest levels, for finding TAC criteria
       # (then harvest rate remains constant for years within a sim)
       gamma_H0 = rep(gamma_H0_mn*ig1[r],Nyrs-1)
