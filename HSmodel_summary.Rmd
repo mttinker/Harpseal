@@ -345,7 +345,7 @@ ix = c(which(vns=="N0"),which(vns=="beta1"),which(vns=="beta2"),
        which(vns=="psi2"),which(vns=="gamma_H0_mn"),which(vns=="gamma_HA_mn"),
        which(vns=="sigH"),which(vns=="tau") )
 
-statsum = sumstats[ix,c(1,3,4,8,10)]
+statsum = sumstats[ix,c(1,3,5,7,10)]
 
 row.names(statsum) = c("N0(millions)","Beta_1","Beta_2","phi_F","theta_F",
                        "delta_F","sigma_F","alpha_0","alpha_1","alpha_2",
@@ -791,10 +791,11 @@ titletxt = "Figure 16: Model projected abundance with zero harvest (including pu
 subtxt =  paste0("Estimated long-term equilibrium (K) = ", format(Kest/1000000,digits = 3),
                  "million (CI95 = ", format(Kest_CI[1]/1000000,digits = 3),
                  " - ", format(Kest_CI[2]/1000000,digits = 3),")")
+
 plt_N_Kest = ggplot(data=dpN_K,aes(x=Year,y=N_pred_mean)) +
   geom_ribbon(aes(ymin=N_pred_lo,ymax=N_pred_hi),alpha=0.3) +
-  geom_line() + labs(x = "Year",y="Projected abundance") +
-  geom_hline(yintercept=Kest, linetype="dashed", color = "red") +
+  geom_line() + labs(x = "Year",y="Projected abundance (millions)") +
+  geom_hline(yintercept=Kest/1000000, linetype="dashed", color = "red") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plt_N_Kest)
 

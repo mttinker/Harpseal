@@ -2,6 +2,7 @@
 #   NOTE: 3 pupping areas: 1) S.GSL, 2) N.GSL, 3) Front
 #       - for ice mortality, allow some pup deaths to occur before counts?
 #
+rm(list = ls())
 # User-set parameters--------------------------------------------------------
 #
 # Specify year range of time series for model fitting 
@@ -123,8 +124,8 @@ for (y in 1:Nyrs){
     Q_0[y] = df.HV$PUP_prob_rec[ii]
   }
 }
-# Shift CI to account for lag 
-CI = c(CI[1], CI)
+# Shift CI to account for lag ?
+#   CI = c(CI[1], CI); CI = CI[1:Nyrs]
 # Create a "dummy vector" of ice anomaly values from -1 to 1 (step size 0.05), 
 #  and discretized version of IC anomaly values classified to units of 0.05 
 #  (to speed up fitting)
@@ -159,7 +160,7 @@ init_fun <- function() {list(sigF=runif(1, .5, .8),
                              zeta=runif(1, 3.5, 4.5),
                              beta1=runif(1, 3-.25, 3+.25),
                              beta2=runif(1, .25, .35),
-                             dlta=runif(1, .05, .1),
+                             dlta=runif(2, .5, .7),
                              gamma_H0_mn=runif(1, 5.5, 6),
                              gamma_HA_mn=runif(1, 3, 3.5),
                              N0mil = runif(1, N0pri*.95, N0pri*1.05),
@@ -195,14 +196,14 @@ suppressMessages(
     fit <- mod$sample(
       data = stan.data,
       init = init_fun,
-      seed = 123,
+      seed = 1234,
       chains = ncore,
       parallel_chains = ncore,
       refresh = 100,
       iter_warmup = nburnin,
       iter_sampling = Niter,
       max_treedepth = 12,
-      adapt_delta = 0.9
+      adapt_delta = 0.8
     )
   )
 )

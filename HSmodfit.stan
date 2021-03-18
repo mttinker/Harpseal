@@ -17,7 +17,7 @@ data {
   vector[Nages+1] agesC2;         // vector of re-centered age class values squared
   simplex[Nages] sad0;            // vector of initial stable age distribution values
   int<lower=1> IC[Nyrs,Nareas];   // Annual ice anomaly values by area (discretized, 41 steps of 0.05 units)
-  real CI[Nyrs+1];                // array of annual environmental climate index values
+  real CI[Nyrs];                // array of annual environmental climate index values
   int<lower=0> Agects[NCobs,NCages];// matrix of adult counts by age class (cols) & year (rows)
   int<lower=0> NFsamp[NPRobs];    // Number females sampled for pregnancy status (grouped by year, age)  
   int<lower=0> NPrg[NPRobs];      // Number pregnant females per sample (grouped by year, age)
@@ -201,7 +201,7 @@ model {
   alpha0 ~ normal(3,1) ;
   alpha1 ~ normal(0,.5) ;
   alpha2 ~ normal(0,0.1) ;
-  zeta ~ normal(4,1) ;
+  zeta ~ normal(4,2) ;
 }
 // Section 5. Derived parameters and statistics 
 generated quantities {

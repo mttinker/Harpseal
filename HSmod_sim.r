@@ -20,7 +20,6 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     class(me) <- append(class(me),"multiResultClass")
     return(me)
   }
-  set.seed(123)
   # TO DELETE: Some default values that may get overwritten by input files:
   #  futuresim = 0 # (note: if this is a "future sim", loaded data will update this)
   #  thta = 2 # (NOTE if thta provided as fixed user input, it will replace this)
@@ -34,16 +33,24 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     ##now create a new variable with the original name of the list item
     eval(parse(text=paste(names(sim.data)[[i]],"= tempobj")))
   }
+  set.seed(123)
+  r_vec2 = sample(1000,reps,replace = T)
+  PAr = gtools::rdirichlet(1000+Nyrs, 25*PAmeans)
+  epsFr = matrix(rnorm(1000*Nyrs,0,1),nrow=1000)
+  epsSr = matrix(rnorm(1000*Nyrs,0,1),nrow=1000)
+  ig1 = runif(reps,.3,1.5)
+  ig2 = runif(reps,.05,1.2)
   # Process variables and set up arrays for simulations
   if(nrow(IC)==1000){
+    ICr = rbind(IC,IC[1:Nyrs,])  
+    CIr = c(CI,CI[1:Nyrs])    
+  }else{
     ICr = IC
-    CIr = CI    
+    CIr = CI
   }
   if (futuresim==2){
-    # random multipliers for harvest hazards,
-    # used to increase range of values considered
-    ig1 = runif(reps,.3,1.5)
-    ig2 = runif(reps,.05,1.2)
+    Mort_othP = Grn_P*(1/.5) + Arc_P*(1/.5) + Byc_P
+    Mort_othA = Grn_A*(1/.5) + Arc_A*(1/.5) + Byc_A
   }
   iy = c(rep(1,20),seq(2,Nyrs-1))
   iz = numeric(length = length(iy)); iz[1:19] = 1
@@ -62,23 +69,23 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
   #
   # Loop through random iterations of model
   #  using Parallel processing to speed things up
-  set.seed(123)
   simresults = foreach(r=1:reps) %dorng% {
     mcmc = mcmc1
-    vn=vn1
+    vn = vn1
     rr = r_vec[r]
+    rrr = r_vec2[r]
     # Extract parameters from joint posterior
     pars = init_fun(rr)
     for(i in 1:length(pars)){
       ##first extract the object value
-      tempobj=pars[[i]]
+      tempobj=as.numeric(pars[[i]])
       ##now create a new variable with the original name of the list item
       eval(parse(text=paste(names(pars)[[i]],"= tempobj")))
     }
     # Initialize variables
-    if(nrow(IC)==1000){
-      IC = ICr[sample(1000,Nyrs,replace = T),]
-      CI = CIr[sample(1000,Nyrs,replace = T)]
+    if(nrow(ICr)>=1000){
+      IC = ICr[rrr:(rrr+Nyrs),]
+      CI = CIr[rrr:(rrr+Nyrs)]
     }
     N = numeric(length = Nyrs)
     Nml = numeric(length = Nyrs)
@@ -91,39 +98,34 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
     FmAgeVec = array(dim = c(NCages,Nyrs-1))
     PredPup = numeric(length = Nyrs-1)
     PredPupA = array(dim = c(Nareas,Nyrs-1))
-    epsF = rnorm(Nyrs-1,0,sigF)
-    epsS = rnorm(Nyrs-1,0,sigS)    
     # Harvest mort: depends on type of scenario
     if(futuresim==0){
       # Increased stochasticity to mimic effects of autocorrelation
-      epsF = rnorm(Nyrs-1,0,2*sigF) + .5
-      epsS = rnorm(Nyrs-1,0,2*sigS) - .5    
+      epsF = epsFr[rrr,]*as.numeric(sigF)*2 + .5 
+      epsS = epsSr[rrr,]*as.numeric(sigS)*2 - .5
       # Level of harvest as observed
       gamma_H0 = gamma_H0
       gamma_HA = gamma_HA
     }else if(futuresim==1){
       # Increased stochasticity to mimic effects of autocorrelation
-      epsF = rnorm(Nyrs-1,0,1.5*sigF) + .5
-      epsS = rnorm(Nyrs-1,0,1.5*sigS) - .5         
+      epsF = epsFr[rrr,]*as.numeric(sigF)*2 + .5 
+      epsS = epsSr[rrr,]*as.numeric(sigS)*2 - .5 
       # No harvest hazards (for estimating K)
       gamma_H0 = rep(0,Nyrs-1)
       gamma_HA = rep(0,Nyrs-1)
     }else if(futuresim==2){
       # Increased stochasticity to mimic effects of autocorrelation
-      epsF = rnorm(Nyrs-1,0,1.5*sigF) + .5
-      epsS = rnorm(Nyrs-1,0,1.5*sigS) - .5   
+      epsF = epsFr[rrr,]*as.numeric(sigF)*1.25 + .25 
+      epsS = epsSr[rrr,]*as.numeric(sigS)*1.25 - .25      
       # Range of harvest levels, for finding TAC criteria
       # (then harvest rate remains constant for years within a sim)
       gamma_H0 = rep(gamma_H0_mn*ig1[r],Nyrs-1)
       gamma_HA = rep(gamma_HA_mn*ig2[r],Nyrs-1)
     }
-    PA = array(dim=c(3,Nyrs-1))
-    for(i in 1:(Nyrs-1)){
-      PA[1:3,i] = gtools::rdirichlet(1, 20*PAmeans)
-    }
-    N[1] = N0pri 
+    PA = PAr[rrr:(rrr+Nyrs),]
+    N[1] = as.numeric(N0pri) 
     Nml[1] = N[1]/1000000 
-    gamma_D_scale = (1/(ages + 0.5))^zeta
+    gamma_D_scale = (1/(ages + 0.5))^as.numeric(zeta)
     # Loop through years to calculate demographic transitions and population dynamics 
     for (ix in 1:length(iy)){
       # npsv = 1-(gtools::inv.logit(rnorm(1,0,1))/10) 
@@ -153,7 +155,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
         gamma_I[a] = 8 * exp((psi1+psiadj[a]) - (IC[i,a] * psi2)) / (1 + exp((psi1+psiadj[a]) - (IC[i,a] * psi2))) 
         haz_I_A[a] = exp(omega + gamma_I[a]) 
       } 
-      haz_I = sum(PA[,i] * haz_I_A)
+      haz_I = sum(PA[i,] * haz_I_A)
       haz_H0 = exp(omega + gamma_H0[i]) 
       S0[i] = exp(-1 * (haz_0 + haz_I + haz_H0)) 
       #  Adult competing hazards and net realized survival
@@ -168,7 +170,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
         HV0_pred[i] =  HV0_pred[i] * .9
       }      
       if (futuresim==2){
-        HV0_can = HV0_pred[i] - Grn_P*runif(1,.9,1.1)*(1/.5) - Arc_P*runif(1,.95,1.05)*(1/.5) - Byc_P*runif(1,.7,1.3)
+        HV0_can = HV0_pred[i] - Mort_othP # [r,i]
         HV0_pred[i] = HV0_can * .95
       }
       prp_HV_A = haz_HA / (haz_A + haz_HA) 
@@ -177,7 +179,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
         HVA_pred[i] =  HVA_pred[i] * .5
       }
       if (futuresim==2){
-        HVA_can = HVA_pred[i] - Grn_A*runif(1,.9,1.1)*(1/.5) - Arc_A*runif(1,.95,1.05)*(1/.5) - Byc_A*runif(1,.7,1.3)
+        HVA_can = HVA_pred[i] - Mort_othA # [r,i]
         HVA_pred[i] = HVA_can * .5
       }    
       #  Annual demographic transitions
@@ -195,7 +197,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
         #  Predicted Pups to be surveyed (allowing for early ice mortality), 
         #    by area and total, for year i 
         for (a in 1:Nareas){
-          PredPupA[a,i] = sum((n[,i] * Fc[,i]) * 0.5 * npsv * PA[a,i] ) ;
+          PredPupA[a,i] = sum((n[,i] * Fc[,i]) * 0.5 * npsv * PA[i,a] ) ;
         }
         PredPup[i] = sum(PredPupA[,i])
       }

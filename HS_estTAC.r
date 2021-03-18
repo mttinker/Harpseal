@@ -1,4 +1,30 @@
 # Script to plot some results from model fitting
+# - K CI, should be CI of mean, not quantiles of abundance (bootstrap?)
+# - fix TAC so not multiples of 5...
+#
+rm(list = ls())
+# USER-SET PARAMETERS:
+reps = 10000     # number of simulation reps to use
+PAmeans = c(.18,.07,.75) # future expected proportion of pups in S Gulf, N Gulf, Front
+# Specify year ranges to use to parameterize future conditions for ice and climate
+Y1_ice = 2000    # first year of ice cover time series to use to parameterize future sims
+Y2_ice = 2020    # last year of ice cover time series to use to parameterize future sims
+Y1_CI = 1951     # first year of CI index time series to use to parameterize future sims
+Y2_CI = 2020     # last year of CI index time series to use to parameterize future sims
+# Set AVERAGE "other" human mortality for future sims (not included in Canadian harvest)
+GrnH = 50000
+ArcH = 1000
+Byctc = 2000
+# Specify adult/pup breakdown of "other" human mortality
+Grn_A = .857*GrnH
+Grn_P = .143*GrnH
+Arc_A = .95*ArcH
+Arc_P = .05*ArcH
+Byc_A = .2*Byctc
+Byc_P = .8*Byctc
+#
+# END USER PARAMETERS
+#
 # Load results file (if not already loaded into workspace):-------------------
 load(file="Results.rdata")
 #
@@ -14,20 +40,8 @@ require(dplyr)
 require(stats)
 require(betareg)
 #
-reps = 20000
-PAmeans = c(.18,.07,.75) # future proportion pups in S Gulf, N Gulf, Front
 set.seed(123)
 r_vec = sample(nrow(mcmc),reps,replace = T)
-# Set other human mortality not included in Canadian harvest
-GrnH = 50000
-Grn_A = .857*GrnH
-Grn_P = .143*GrnH
-ArcH = 1000
-Arc_A = .95*ArcH
-Arc_P = .05*ArcH
-Byctc = 2000
-Byc_A = .2*Byctc
-Byc_P = .8*Byctc
 #
 # Function to draw from joint posteriors
 init_fun <- function(rr) {list(
@@ -95,23 +109,26 @@ SAD0 = as.data.frame(rslt$SAD)
 
 # Part 2: K-est sims--------------------------------------------------------------
 #
+reps2 = reps*5
+set.seed(123)
+r_vec = sample(nrow(mcmc),reps2,replace = T)
+#
 futuresim = 1; # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
-Nyrs2 = 100; Yearst2 = 2021 ; 
+Nyrs2 = 100; Yearst2 = YearT+1 ; 
 N_end = sumstats[which(vns==paste0("N[",Nyrs,"]")),1]  
-# Future conditions: based on ice and CI indices from after year YY, 
+# Future conditions: based on ice and CI indices from specified year range, 
 #  fit appropriate random sampling distributions
-YY = 2000
-ii = which(df.NLCI$Year>=1951)
+ii = which(df.NLCI$Year>= max(min(df.NLCI$Year), Y1_CI) &  df.NLCI$Year <= min(max(df.NLCI$Year), Y2_CI))
 ft = fitdist(df.NLCI$CI[ii],"norm")
 CI2 = rnorm(1000,coef(ft)[1],coef(ft)[2])
-ii = which(df.Ice$Year>=YY)
+ii = which(df.Ice$Year>= max(min(df.Ice$Year), Y1_ice) &  df.Ice$Year <= min(max(df.Ice$Year), Y2_ice))
 ft = fitdist(exp(df.Ice$Gulf_Anom[ii]),"norm")
 icg1 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
 ft = fitdist(exp(df.Ice$Lab_Anom[ii]),"norm")
 icg2 = log(pmax(0.368,pmin(2.715,rnorm(1000,coef(ft)[1],coef(ft)[2]))))
 IC2 = as.matrix(cbind(icg1,icg1,icg2))
 # Update data
-sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,r_vec=r_vec,
+sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps2,r_vec=r_vec,
                  PAmeans=PAmeans,futuresim=futuresim,
                  NCages=NCages,NCage1=NCage1,Nages=Nages,Nareas=Nareas,
                  ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CI=CI2,
@@ -125,34 +142,40 @@ N_Predict = rsltK$N_Predict
 P_Predict = rsltK$P_Predict
 P_Predict = rbind(P_Predict,colMeans(P_Predict[(Nyrs2-4):(Nyrs2-1),]))
 Np_Predict = (N_Predict + P_Predict)
-Nfin = colMeans(Np_Predict[(Nyrs2/2):Nyrs2,])
+Nfin = apply(Np_Predict[round(Nyrs2/2):Nyrs2,],1, median)
+# stats = as.numeric(exp(quantile(log(Nfin),probs=c(0.5,0.025,0.975))))
 Kest = mean(Nfin)
 Kest_sd = sd(Nfin)
-Kest_CI = quantile(Nfin, prob=c(0.025,0.975))
+Kest_CI = quantile(Nfin,probs=c(0.01,0.99))
 Ktab = data.frame(Metric = "Equilibrium abundance",
                   Mean = Kest/1000000, SD = Kest_sd/1000000, 
                   CI95_low=Kest_CI[1]/1000000,CI95_high=Kest_CI[2]/1000000)
 print(Ktab)
 # Plot
-dpN_K = data.frame(Year = Yearp2, N_pred_mean = rowMeans(Np_Predict),
-                    N_pred_lo = apply(Np_Predict,1,quantile,prob=0.025),
-                    N_pred_hi = apply(Np_Predict,1,quantile,prob=0.975))
+dpN_K = data.frame(Year = Yearp2, 
+                    N_pred_mean = smooth.spline(apply(Np_Predict, 1, median),spar=.5)$y /1000000,
+                    N_pred_lo = smooth.spline(apply(Np_Predict,1,quantile,prob=0.25),spar=.5)$y /1000000,
+                    N_pred_hi = smooth.spline(apply(Np_Predict,1,quantile,prob=0.75),spar=.5)$y /1000000 )
 titletxt = "Model projected abundance with zero harvest (including pups)"
 subtxt =  paste0("Estimated long-term equilibrium (K) = ", format(Kest/1000000,digits = 3),
                  "million (CI95 = ", format(Kest_CI[1]/1000000,digits = 3),
                  " - ", format(Kest_CI[2]/1000000,digits = 3),")")
 plt_N_Kest = ggplot(data=dpN_K,aes(x=Year,y=N_pred_mean)) +
   geom_ribbon(aes(ymin=N_pred_lo,ymax=N_pred_hi),alpha=0.3) +
-  geom_line() + labs(x = "Year",y="Projected abundance") +
-  geom_hline(yintercept=Kest, linetype="dashed", color = "red") +
+  geom_line() + labs(x = "Year",y="Projected abundance (millions)") +
+  geom_hline(yintercept=Kest/1000000, linetype="dashed", color = "red") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plt_N_Kest)
 # 
 # Part 3: TAC-est sims-------------------------------------------------------------
 #
+reps2 = reps*10
+set.seed(123)
+r_vec = sample(nrow(mcmc),reps2,replace = T)
+# source("HSmod_sim.r")
 # Set up sims for 15 years under varying harvest levels
 futuresim = 2 # 0 = past harvest, 1 = no harvest, 2 = evaluate range of harvests
-Nyrs2 = 15; Yearst2 = 2021 ; 
+Nyrs2 = 15; Yearst2 = YearT+1 ; 
 # Future ice/env conditions: same as for K sims above
 #
 N_ad = sumstats[which(startsWith(vns,"N[")),1]
@@ -164,7 +187,7 @@ N70P = N70/8000000
 N50P = N50/8000000
 
 # Update data
-sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps,r_vec=r_vec,
+sim.data <- list(Nyrs=Nyrs2,N0pri=N_end,reps=reps2,r_vec=r_vec,
                  PAmeans=PAmeans,futuresim=futuresim,
                  NCages=NCages,NCage1=NCage1,Nages=Nages,Nareas=Nareas,
                  ages=ages,ages2=ages2,sad0=sad0,IC=IC2,CI=CI2,
@@ -242,19 +265,20 @@ ggplot(pred50ad,aes(x=HvT,y=Fitted)) +
   xlim(0,1250) + ylim(0,8000000) +
   theme_classic()
 
+rndint = 1
 ii = which(abs(pred05ad$Lower-(N70+1000))==min(abs(pred05ad$Lower-(N70+1000))))
-TACN70pa05 = floor(HvTeval05[ii]/5)*5  
+TACN70pa05 = floor(HvTeval05[ii]/rndint)*rndint  
 ii = which(abs(pred05ad$Lower-(N50+1000))==min(abs(pred05ad$Lower-(N50+1000))))
-TACN50pa05 = floor(HvTeval05[ii]/5)*5 
+TACN50pa05 = floor(HvTeval05[ii]/rndint)*rndint 
 ii = which(abs(pred10ad$Lower-(N70+1000))==min(abs(pred10ad$Lower-(N70+1000))))
-TACN70pa10 = floor(HvTeval10[ii]/5)*5  
+TACN70pa10 = floor(HvTeval10[ii]/rndint)*rndint  
 ii = which(abs(pred10ad$Lower-(N50+1000))==min(abs(pred10ad$Lower-(N50+1000))))
-TACN50pa10 = floor(HvTeval10[ii]/5)*5  
+TACN50pa10 = floor(HvTeval10[ii]/rndint)*rndint  
 ii = which(abs(pred50ad$Lower-(N70+1000))==min(abs(pred50ad$Lower-(N70+1000))))
-TACN70pa50 = floor(HvTeval50[ii]/5)*5  
+TACN70pa50 = floor(HvTeval50[ii]/rndint)*rndint  
 TACN70pa50 = min(TACN70pa50,TACN70pa10-5)
 ii = which(abs(pred50ad$Lower-(N50+1000))==min(abs(pred50ad$Lower-(N50+1000))))
-TACN50pa50 = floor(HvTeval50[ii]/5)*5  
+TACN50pa50 = floor(HvTeval50[ii]/rndint)*rndint  
 TACN50pa50 = min(TACN50pa50,TACN50pa10-5)
 # 
 # Create table of TAC recomendations
