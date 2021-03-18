@@ -201,8 +201,8 @@ r_vec2 = sample(1000,reps2,replace = T)
 PAr = rdirichlet(1000+Nyrs2, 25*PAmeans)
 epsFr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
 epsSr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
-ig1 = runif(reps2,.1,1.2)
-ig2 = runif(reps2,.2,1.5)
+ig1 = runif(reps2,.01,1.2)
+ig2 = runif(reps2,.01,1.5)
 # source("HSmod_sim.r")
 # Future conditions: based on ice and CI indices from specified year range, 
 #  fit appropriate random sampling distributions
@@ -243,21 +243,33 @@ Hvp = rsltTAC$HV0_predict
 Hva = rsltTAC$HVA_predict
 Hvp_k = apply(Hvp,2,mean)/1000 
 Hva_k = apply(Hva,2,mean)/1000 
-ii = which(Hvp_k>0 & Hva_k>0)
+HvT = Hvp_k + Hva_k
+ii = which(Hvp_k > 0 & Hva_k > 0 & HvT<500)
+Nmin = apply(Np_Predict,2,min); Nmin = Nmin[ii]
 HvT = Hvp_k[ii]+Hva_k[ii]
 ppA = Hva_k[ii]/HvT
-Nmin = apply(Np_Predict,2,quantile,prob=0.05); Nmin = Nmin[ii]
-# Nmin = apply(Np_Predict,2,min); Nmin = Nmin[ii]
+# Nmin = apply(Np_Predict,2,quantile,prob=0.05); Nmin = Nmin[ii]
+
 # Convert to 0-1 for betareg
 NminP = Nmin / 8000000
 dat_N_Hv = data.frame(Nmin=NminP,HvT=HvT,HvT2 = HvT*HvT,ppA=ppA,ppA2=ppA*ppA,intx = HvT*ppA)
 # GLM model - convert to 0-1 distribtion and use beta regression 
-fit = betareg(NminP ~ HvT+HvT2+ppA+ppA2+intx,data=dat_N_Hv,link = "logit")
-summary(fit)
+#fit = betareg(NminP ~ HvT+ppA+intx,data=dat_N_Hv,link = "logit")
+#summary(fit)
+dat_N_Hv05 = dat_N_Hv[which(dat_N_Hv$ppA>0.02 & dat_N_Hv$ppA<0.08),]
+dat_N_Hv10 = dat_N_Hv[which(dat_N_Hv$ppA>0.07 & dat_N_Hv$ppA<0.13),]
+dat_N_Hv50 = dat_N_Hv[which(dat_N_Hv$ppA>0.45 & dat_N_Hv$ppA<0.55),]
 #
-HvTeval05 = seq(1,1200)
-HvTeval10 = seq(1,1200)
-HvTeval50 = seq(1,1200)
+fit05 = betareg(Nmin ~ HvT+HvT2,data=dat_N_Hv05,link = "logit")
+summary(fit05)
+fit10 = betareg(Nmin ~ HvT+HvT2,data=dat_N_Hv10,link = "logit")
+summary(fit10)
+fit50 = betareg(Nmin ~ HvT+HvT2,data=dat_N_Hv50,link = "logit")
+summary(fit50)
+#
+HvTeval05 = seq(1,600)
+HvTeval10 = seq(1,600)
+HvTeval50 = seq(1,600)
 tmp = data.frame(HvT=HvTeval05, HvT2=HvTeval05^2, ppA=rep(.05,length(HvTeval05)));  
 tmp$intx = tmp$HvT*tmp$ppA; tmp$ppA2 =  tmp$ppA*tmp$ppA
 newdat05ad = tmp; 
@@ -267,46 +279,50 @@ newdat10ad =   tmp;
 tmp = data.frame(HvT=HvTeval50, HvT2=HvTeval50^2, ppA=rep(.5,length(HvTeval50))); 
 tmp$intx = tmp$HvT*tmp$ppA; tmp$ppA2 =  tmp$ppA*tmp$ppA
 newdat50ad = tmp;
-
-tmp = predict(fit, newdata = newdat05ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
+#
+tmp = predict(fit05, newdata = newdat05ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
 pred05ad = data.frame(HvT=HvTeval05,Fitted = tmp[,2],Lower = tmp[,1],Upper=tmp[,3])
-
-tmp = predict(fit, newdata = newdat10ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
+tmp = predict(fit10, newdata = newdat10ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
 pred10ad = data.frame(HvT=HvTeval10,Fitted = tmp[,2],Lower = tmp[,1],Upper=tmp[,3])
-
-tmp = predict(fit, newdata = newdat50ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
+tmp = predict(fit50, newdata = newdat50ad, type = "quantile", at = c(0.2, 0.5, 0.8)); tmp = tmp * 8000000; 
 pred50ad = data.frame(HvT=HvTeval50,Fitted = tmp[,2],Lower = tmp[,1],Upper=tmp[,3])
-
+#
 ggplot(pred05ad,aes(x=HvT,y=Fitted)) +
   geom_ribbon(aes(ymin=Lower,ymax=Upper),alpha=0.3) +
   geom_line() +
   labs(x="Harvest level",y="Minimum abundance, 15-yr projection",
        title="Harvest impacts on futue abundance, 5% adults") +
-  geom_point(data=dat_N_Hv[which(dat_N_Hv$ppA>0.03 & dat_N_Hv$ppA<0.07),],
+  geom_point(data=dat_N_Hv05,
              aes(x=HvT,y=Nmin*8000000)) +
-  xlim(0,750) + ylim(0,8000000) +
+  geom_hline(yintercept=N70, linetype="dashed", color = "red") +
+  geom_hline(yintercept=N50, linetype="dashed", color = "purple") +
+  xlim(0,500) + ylim(0,8000000) +
   theme_classic()
-
+#
 ggplot(pred10ad,aes(x=HvT,y=Fitted)) +
   geom_ribbon(aes(ymin=Lower,ymax=Upper),alpha=0.3) +
   geom_line() +
   labs(x="Harvest level",y="Minimum abundance, 15-yr projection",
        title="Harvest impacts on futue abundance, 10% adults") +
-  geom_point(data=dat_N_Hv[which(dat_N_Hv$ppA>0.08 & dat_N_Hv$ppA<0.12),],
+  geom_point(data=dat_N_Hv10,
              aes(x=HvT,y=Nmin*8000000)) +
-  xlim(0,500) + ylim(0,8000000) +
+  geom_hline(yintercept=N70, linetype="dashed", color = "red") +
+  geom_hline(yintercept=N50, linetype="dashed", color = "purple") +  
+  xlim(0,400) + ylim(0,8000000) +
   theme_classic()
-
+#
 ggplot(pred50ad,aes(x=HvT,y=Fitted)) +
   geom_ribbon(aes(ymin=Lower,ymax=Upper),alpha=0.3) +
   geom_line() +
   labs(x="Harvest level",y="Minimum abundance, 15-yr projection",
        title="Harvest impacts on futue abundance, 50% adults") +
-  geom_point(data=dat_N_Hv[which(dat_N_Hv$ppA>0.45 & dat_N_Hv$ppA<0.55),],
+  geom_point(data=dat_N_Hv50,
              aes(x=HvT,y=Nmin*8000000)) +
-  xlim(0,500) + ylim(0,8000000) +
+  geom_hline(yintercept=N70, linetype="dashed", color = "red") +
+  geom_hline(yintercept=N50, linetype="dashed", color = "purple") +  
+  xlim(0,300) + ylim(0,8000000) +
   theme_classic()
-
+#
 rndint = 1
 ii = which(abs(pred05ad$Lower-(N70+1000))==min(abs(pred05ad$Lower-(N70+1000))))
 TACN70pa05 = floor(HvTeval05[ii]/rndint)*rndint  
