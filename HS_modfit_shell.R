@@ -216,10 +216,10 @@ vns = row.names(sumstats)
 # Some traceplots to inspect results
 traceplot(out, pars=c("sigF","sigS","sigH"), inc_warmup = F, nrow = 2)
 #
-rm(out)
+rm(out,params)
 #
 # Save results --------------------------------------------------------------
 #
-save.image(file=paste0("./Results/FitHSmod_Results_",
-                       format(Sys.time(),  "%b%d_%H%M"),"_ab",Age_bias_adj*100,
-                       "_m",NCage1,".rdata"))
+resultsfile = paste0("HS_Results_",format(Sys.time(),"%y_%b%d_%H%M"),"_ab",
+                     Age_bias_adj*100,"_m",NCage1,".rdata")
+save.image(file=paste0("./Results/",resultsfile)) 

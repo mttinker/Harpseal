@@ -1,8 +1,8 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):---
 if( !exists("sumstats") ){
-  loadfile = file.choose(new = FALSE)
-  load(file=loadfile)
+  tmp = file.choose(new = FALSE)
+  load(file=tmp)
   #
 }
 require(readxl)

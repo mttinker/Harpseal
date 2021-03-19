@@ -16,7 +16,7 @@ CV_HV = 0.1
 # Youngest adult age class to consider for age composition fitting
 NCage1 = 3; # Note: recommend 3, ages <7 are adjusted for negative sampling bias
 # Age_bias_adj represents the increment in proportion missed for each year younger than 7
-Age_bias_adj = 0.1 # value of 0.1 means 10% missed for 6yr-olds, 20% missed for 5yr-olds...
+Age_bias_adj = 0.0 # value of 0.1 means 10% missed for 6yr-olds, 20% missed for 5yr-olds...
 # Suggested Prior means 
 # Ice anomaly effects on pup survival: export opinion for prior
 psipri1 = -1  # prior for psi param1 of ice anomaly effect fxn, Gulf (see figure)
@@ -215,11 +215,11 @@ draws = fit$draws(variables = "sigF"); mcmc_trace(draws)
 draws = fit$draws(variables = "sigS"); mcmc_trace(draws)
 draws = fit$draws(variables = "tau"); mcmc_trace(draws)
 #
-rm(fit,mod)
+rm(fit,mod,params)
 #
 # Save results --------------------------------------------------------------
 #
-save.image(file=paste0("./Results/FitHSmod_Results_",
-                       format(Sys.time(),  "%b%d_%H%M"),"_ab",Age_bias_adj*100,
-                       "_m",NCage1,".rdata"))
+resultsfile = paste0("HS_Results_",format(Sys.time(),"%y_%b%d_%H%M"),"_ab",
+                     Age_bias_adj*100,"_m",NCage1,".rdata")
+save.image(file=paste0("./Results/",resultsfile)) 
 #

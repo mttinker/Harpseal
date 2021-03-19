@@ -1,9 +1,13 @@
 # Script to plot some results from model fitting
-# - K CI, should be CI of mean, not quantiles of abundance (bootstrap?)
-# - fix TAC so not multiples of 5...
-#
-rm(list = ls())
-# USER-SET PARAMETERS:
+if( !exists("resultsfile") ){
+  resultsfile = file.choose(new = FALSE)
+  split_path <- function(x) if (dirname(x)==x) x else c(basename(x),split_path(dirname(x)))
+  tmp = split_path(resultsfile)
+  saveTACname = tmp[1]; saveTACname = paste0("TAC_",saveTACname)
+  subfolder = tmp[2]
+  load(file=resultsfile)
+}
+# USER-SET PARAMETERS---------------------------------------------------------------
 reps = 10000     # number of simulation reps to use (1000 for fast, 10000 for precise)
 PAmeans = c(.18,.07,.75) # future expected proportion of pups in S Gulf, N Gulf, Front
 # Specify year ranges to use to parameterize future conditions for ice and climate
@@ -23,10 +27,9 @@ Arc_P = .05*ArcH
 Byc_A = .2*Byctc
 Byc_P = .8*Byctc
 #
-# END USER PARAMETERS
+# END USER PARAMETERS --------------------------------------------------------
 #
-# Load results file (if not already loaded into workspace):-------------------
-load(file="Results.rdata")
+# Load libraries
 #
 library(foreach)
 library(doParallel)
@@ -40,6 +43,7 @@ require(dplyr)
 require(stats)
 require(gtools)
 require(betareg)
+require(svDialogs)
 #
 # Function to draw from joint posteriors
 init_fun <- function(rr) {list(
@@ -81,7 +85,7 @@ set.seed(123)
 # r_vec = matrix(0,nrow = reps, ncol = 2)
 r_vec = sample(nrow(mcmc),reps,replace = T)
 r_vec2 = sample(1000,reps,replace = T)
-PAr = rdirichlet(1000+Nyrs2, 25*PAmeans)
+PAr = rdirichlet(1000+Nyrs2, 50*PAmeans)
 epsFr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
 epsSr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
 ig1 = runif(reps,.3,1.5)
@@ -128,7 +132,7 @@ set.seed(123)
 # r_vec = matrix(0,nrow = reps, ncol = 2)
 r_vec = sample(nrow(mcmc),reps2,replace = T)
 r_vec2 = sample(1000,reps2,replace = T)
-PAr = rdirichlet(1000+Nyrs2, 25*PAmeans)
+PAr = rdirichlet(1000+Nyrs2, 50*PAmeans)
 epsFr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
 epsSr = matrix(rnorm(1000*Nyrs2,0,1),nrow=1000)
 ig1 = runif(reps2,.3,1.5)
@@ -326,22 +330,22 @@ ggplot(pred50ad,aes(x=HvT,y=Fitted)) +
 rndint = 1
 ii = which(abs(pred05ad$Lower-(N70+1000))==min(abs(pred05ad$Lower-(N70+1000))))
 TACN70pa05 = floor(HvTeval05[ii]/rndint)*rndint  
-TACN70pa05 = max(10,TACN70pa05)
+TACN70pa05 = max(5,TACN70pa05)
 ii = which(abs(pred05ad$Lower-(N50+1000))==min(abs(pred05ad$Lower-(N50+1000))))
 TACN50pa05 = floor(HvTeval05[ii]/rndint)*rndint 
-TACN50pa05 = max(10,TACN50pa05)
+TACN50pa05 = max(5,TACN50pa05)
 ii = which(abs(pred10ad$Lower-(N70+1000))==min(abs(pred10ad$Lower-(N70+1000))))
 TACN70pa10 = floor(HvTeval10[ii]/rndint)*rndint  
-TACN70pa10 = max(7, min(TACN70pa10,TACN70pa05-1))
+TACN70pa10 = max(2, min(TACN70pa10,TACN70pa05-1))
 ii = which(abs(pred10ad$Lower-(N50+1000))==min(abs(pred10ad$Lower-(N50+1000))))
 TACN50pa10 = floor(HvTeval10[ii]/rndint)*rndint  
-TACN50pa10 = max(7, min(TACN50pa10,TACN50pa05-1))
+TACN50pa10 = max(2, min(TACN50pa10,TACN50pa05-1))
 ii = which(abs(pred50ad$Lower-(N70+1000))==min(abs(pred50ad$Lower-(N70+1000))))
 TACN70pa50 = floor(HvTeval50[ii]/rndint)*rndint  
-TACN70pa50 = max(5, min(TACN70pa50,TACN70pa10-1))
+TACN70pa50 = max(1, min(TACN70pa50,TACN70pa10-1))
 ii = which(abs(pred50ad$Lower-(N50+1000))==min(abs(pred50ad$Lower-(N50+1000))))
 TACN50pa50 = floor(HvTeval50[ii]/rndint)*rndint  
-TACN50pa50 = max(5, min(TACN50pa50,TACN50pa10-1))
+TACN50pa50 = max(1, min(TACN50pa50,TACN50pa10-1))
 # 
 # Create table of TAC recomendations
 TACtab = data.frame(Pcnt_adlt=c(5,10,50),
@@ -350,7 +354,11 @@ TACtab = data.frame(Pcnt_adlt=c(5,10,50),
 print(TACtab)
 
 # Save results ---------------------------------------------------------------
-save(file = "TAC_K_est.rdata",Kest,Kest_CI,SAD0,
+rspns = dlg_message(c("Do you wish to save TAC results? (This will over-write any",
+                      "existing TAC results asociated with this model results file)"), "yesno")$res
+if(rspns=="yes"){
+  save(file=paste0("./",subfolder,"/",saveTACname),
      TACtab,Ktab,dpN_HCst,dpN_K,dat_N_Hv,plt_N_hindcast,plt_N_Kest)
+}
 #
 stopCluster(cl)

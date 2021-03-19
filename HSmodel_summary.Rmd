@@ -1,7 +1,12 @@
 ---
-title: "Harp Seal Population Dynamics Estimated Using a Bayesian Hierarchical Model"
-author: "Prepared for Department of Fisheries and Oceans by M. Tim Tinker"
-date: "3/31/2021"
+params:
+ rep_title: "Harp Seal Population Model" 
+ rep_subtitle: "(Model Version ID and filename)" 
+ rep_date: "03/31/2021" 
+title: "`r params$rep_title`"
+subtitle: "`r params$rep_subtitle`"
+date: "`r params$rep_date`"
+author: "Prepared for Department of Fisheries and Oceans by M.T. Tinker, Nhydra Ecological"
 output: 
   bookdown::html_document2: default 
 editor_options:
