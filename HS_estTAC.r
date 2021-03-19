@@ -357,7 +357,7 @@ print(TACtab)
 rspns = dlg_message(c("Do you wish to save TAC results? (This will over-write any",
                       "existing TAC results asociated with this model results file)"), "yesno")$res
 if(rspns=="yes"){
-  save(file=paste0("./",subfolder,"/",saveTACname),
+  save(file=paste0("./",subfolder,"/",saveTACname), 
      TACtab,Ktab,dpN_HCst,dpN_K,dat_N_Hv,plt_N_hindcast,plt_N_Kest)
 }
 #

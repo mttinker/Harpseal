@@ -802,14 +802,14 @@ A similar Monte Carlo simulation approach provided recommended TAC values under 
 
 ```{r Fig16, echo=FALSE, warning=FALSE}
 titletxt = "Figure 16: Model projected abundance with no human-caused mortality"
-subtxt =  paste0("Estimated long-term equilibrium (K) = ", format(Kest/1000000,digits = 3),
-                 "million (CI95 = ", format(Kest_CI[1]/1000000,digits = 3),
-                 " - ", format(Kest_CI[2]/1000000,digits = 3),")")
+subtxt =  paste0("Estimated long-term equilibrium (K) = ", format(Ktab$Mean,digits = 3),
+                 "million (CI95 = ",format(Ktab$CI95_low,digits = 3),
+                 " - ", format(Ktab$CI95_high, digits = 3),")")
 
 plt_N_Kest = ggplot(data=dpN_K,aes(x=Year,y=N_pred_mean)) +
   geom_ribbon(aes(ymin=N_pred_lo,ymax=N_pred_hi),alpha=0.3) +
   geom_line() + labs(x = "Year",y="Projected abundance (millions)") +
-  geom_hline(yintercept=Kest/1000000, linetype="dashed", color = "red") +
+  geom_hline(yintercept=Ktab$Mean, linetype="dashed", color = "red") +
   ggtitle(titletxt,subtitle =subtxt) + theme_classic()
 print(plt_N_Kest)
 
