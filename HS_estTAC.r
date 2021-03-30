@@ -69,7 +69,7 @@ init_fun <- function(rr) {list(
 )}
 #
 cores=detectCores()
-cl <- makeCluster(min(20,cores[1]-1)) 
+cl <- makeCluster(max(2,min(40,cores[1]-4))) 
 registerDoParallel(cl)
 source("HSmod_sim.r")
 # Part 1: Hindcast sims------------------------------------------------------------

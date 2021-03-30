@@ -1,5 +1,6 @@
 rm(list = ls())
 require(svDialogs)
+require(rJava)
 require(rChoiceDialogs)
 require(rmarkdown)
 

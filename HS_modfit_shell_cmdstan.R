@@ -16,9 +16,9 @@ CV_HV = 0.1
 # Youngest adult age class to consider for age composition fitting
 NCage1 = 3; # Note: recommend 3, ages <7 are adjusted for negative sampling bias
 # Age_bias_adj represents the increment in proportion missed for each year younger than 7
-Age_bias_adj = 0.0 # value of 0.1 means 10% missed for 6yr-olds, 20% missed for 5yr-olds...
+Age_bias_adj = 0.15 # value of 0.1 means 10% missed for 6yr-olds, 20% missed for 5yr-olds...
 # Suggested Prior means 
-# Ice anomaly effects on pup survival: export opinion for prior
+# Ice anomaly effects on pup survival: expert opinion for prior
 psipri1 = -1  # prior for psi param1 of ice anomaly effect fxn, Gulf (see figure)
 psipri2 = 5   # prior for psi param2 of ice anomaly effect fxn, Gulf 
 #
@@ -30,8 +30,6 @@ nsamples = 10000
 # Load libraries-------------------------------------------------------------
 require(parallel)
 require(gtools)
-#require(lattice)
-#require(coda)
 require(ggplot2)
 require(dplyr)
 require(reshape2)
@@ -178,7 +176,12 @@ params <- c("sigF","sigH","sigS","tau","phi","thta","beta1","beta2",
             "log_lik","y_new1","y_new2") # nu
 #
 cores = detectCores()
-ncore = min(20,cores-1)
+if(cores>25){
+  ncore = min(40,cores-10)
+}else{
+  ncore = min(20,cores-1)
+}
+
 #
 fitmodel = c("HSmodfit.stan")
 #
