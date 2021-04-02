@@ -1,23 +1,38 @@
 # Script to plot some results from model fitting
 # Load results file (if not already loaded into workspace):---
-if( !exists("sumstats") ){
-  tmp = file.choose(new = FALSE)
-  load(file=tmp)
-  #
-}
 require(readxl)
 require(stats)
 require(gtools)
 require(fitdistrplus)
 require(dplyr)
-#require(lattice)
-#require(coda)
 require(ggplot2)
 require(bayesplot)
 library(foreach)
 library(doParallel)
 library(doRNG)
 library(gridExtra)
+require(svDialogs)
+require(rJava)
+require(rChoiceDialogs)
+stop_quietly <- function() {
+  opt <- options(show.error.messages = FALSE)
+  on.exit(options(opt))
+  stop()
+}
+if( !exists("sumstats") ){
+  file_list = list.files(path = "./Results",pattern = "HS_Results",full.names = F)
+  rslt_list = grep("TAC", file_list, value = TRUE, invert = TRUE)
+  rslt_list = grep("Report", rslt_list, value = TRUE, invert = TRUE)
+  rdata_file = rselect.list(rslt_list, preselect = NULL, multiple = FALSE,
+                            title = "Select results file" ,
+                            graphics = getOption("menu.graphics")) 
+  if(length(rdata_file)==0){
+    dlg_message(c("No data file selected"), "ok")
+    stop_quietly()
+  }else{
+    load(paste0("./Results/",rdata_file))
+  }
+}
 Year = seq(Year1,Year1+Nyrs-2)
 Yearp = seq(Year1,Year1+Nyrs-1)
 # Diagnostics -----------------------------------------------

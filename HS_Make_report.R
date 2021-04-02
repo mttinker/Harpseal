@@ -16,7 +16,7 @@ rspnse = dlg_message(c("This script is used to generate an html report that summ
 if(rspnse == "cancel"){
   stop_quietly()
 }
-Sys.sleep(.5)
+Sys.sleep(.1)
 file_list = list.files(path = "./Results",pattern = "HS_Results",full.names = F)
 rslt_list = grep("TAC", file_list, value = TRUE, invert = TRUE)
 rslt_list = grep("Report", rslt_list, value = TRUE, invert = TRUE)

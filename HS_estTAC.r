@@ -1,12 +1,5 @@
 # Script to plot some results from model fitting
-if( !exists("resultsfile") ){
-  resultsfile = file.choose(new = FALSE)
-  split_path <- function(x) if (dirname(x)==x) x else c(basename(x),split_path(dirname(x)))
-  tmp = split_path(resultsfile)
-  saveTACname = tmp[1]; saveTACname = paste0("TAC_",saveTACname)
-  subfolder = tmp[2]
-  load(file=resultsfile)
-}
+#
 # USER-SET PARAMETERS---------------------------------------------------------------
 reps = 10000     # number of simulation reps to use (1000 for fast, 10000 for precise)
 PAmeans = c(.18,.07,.75) # future expected proportion of pups in S Gulf, N Gulf, Front
@@ -19,13 +12,13 @@ Y2_CI = 2020     # last year of CI index time series to use to parameterize futu
 GrnH = 50000
 ArcH = 1000
 Byctc = 2000
-# Specify adult/pup breakdown of "other" human mortality
-Grn_A = .857*GrnH
-Grn_P = .143*GrnH
-Arc_A = .95*ArcH
-Arc_P = .05*ArcH
-Byc_A = .2*Byctc
-Byc_P = .8*Byctc
+# Specify adult/pup ratios for "other" human mortality sources
+Grn_A = .857  # Greenland, proportion adults
+Grn_P = .143  # Greenland, proportion pups
+Arc_A = .95   # Arctic, proportion adults
+Arc_P = .05   # Arctic, proportion pups
+Byc_A = .2    # Bycatch, proportion adults
+Byc_P = .8    # Bycatch, proportion pups
 #
 # END USER PARAMETERS --------------------------------------------------------
 #
@@ -44,7 +37,30 @@ require(stats)
 require(gtools)
 require(betareg)
 require(svDialogs)
+require(rJava)
+require(rChoiceDialogs)
 #
+if( !exists("resultsfile") ){
+  # resultsfile = file.choose(new = FALSE)
+  stop_quietly <- function() {
+    opt <- options(show.error.messages = FALSE)
+    on.exit(options(opt))
+    stop()
+  }
+  file_list = list.files(path = "./Results",pattern = "HS_Results",full.names = F)
+  rslt_list = grep("TAC", file_list, value = TRUE, invert = TRUE)
+  rslt_list = grep("Report", rslt_list, value = TRUE, invert = TRUE)
+  rdata_file = rselect.list(rslt_list, preselect = NULL, multiple = FALSE,
+                            title = "Select results file" ,
+                            graphics = getOption("menu.graphics")) 
+  if(length(rdata_file)==0){
+    dlg_message(c("No data file selected"), "ok")
+    stop_quietly()
+  }else{
+    load(paste0("./Results/",rdata_file))
+  }
+}
+saveTACname = paste0("TAC_",resultsfile)
 # Function to draw from joint posteriors
 init_fun <- function(rr) {list(
   sigF = mcmc[rr,vn=="sigF"],
@@ -74,6 +90,14 @@ registerDoParallel(cl)
 source("HSmod_sim.r")
 # Part 1: Hindcast sims------------------------------------------------------------
 #
+Grn_A = Grn_A*GrnH
+Grn_P = Grn_P*GrnH
+Arc_A = Arc_A*ArcH
+Arc_P = Arc_P*ArcH
+Byc_A = Byc_A*Byctc
+Byc_P = Byc_P*Byctc
+
+
 futuresim = 0
 Yearst2=Year1 
 Nyrs2=Nyrs
@@ -352,12 +376,12 @@ TACtab = data.frame(Pcnt_adlt=c(5,10,50),
                     TAC_N70 = c(TACN70pa05,TACN70pa10,TACN70pa50),
                     TAC_N50 =c(TACN50pa05,TACN50pa10,TACN50pa50))
 print(TACtab)
-
+#
 # Save results ---------------------------------------------------------------
 rspns = dlg_message(c("Do you wish to save TAC results? (This will over-write any",
                       "existing TAC results asociated with this model results file)"), "yesno")$res
 if(rspns=="yes"){
-  save(file=paste0("./",subfolder,"/",saveTACname), 
+  save(file=paste0("./Results/",saveTACname), 
      TACtab,Ktab,dpN_HCst,dpN_K,dat_N_Hv,plt_N_hindcast,plt_N_Kest)
 }
 #
