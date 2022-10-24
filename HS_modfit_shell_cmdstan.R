@@ -2,23 +2,6 @@
 #   NOTE: 3 pupping areas: 1) S.GSL, 2) N.GSL, 3) Front
 #       - for ice mortality, allow some pup deaths to occur before counts?
 #
-# To-do list
-# - run with "No GW" ice anom
-# - use inverse of CI index
-# - add prior-posterior comparison figure (panel graph for all params) 
-# - remove TAC sims 
-# - Fig 4 - trim at 7 mil, and put fig 3 after fig 4 
-# - Fig 6. add panel for actual juv mortality (not just deviations),
-#    and add "band" for adult mortality
-# - For ice anomaly fxn fig, add dashed lines showing "prior" dist
-# - Fig 9, change y-axis title to "Total removals" (and remove fig title)
-# - Fig 10 (and all time figures), make x-axis time intervals 5 years
-# - Fig 12, clarify what the proportions actually are... make it
-#   ratio of 8+ animals divided by total pop
-# - think about how to partition variation in juv mortality among sources
-#  (D-D, ice, CI index, removals, and unexplained variance), and present as a 
-#  stacked area graph over time (summed to total mortality)
-
 rm(list = ls())
 # User-set parameters--------------------------------------------------------
 #
