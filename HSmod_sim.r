@@ -82,6 +82,8 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       ##now create a new variable with the original name of the list item
       eval(parse(text=paste(names(pars)[[i]],"= tempobj")))
     }
+    psi1 = numeric()
+    psi1[1] = psi1Gu; psi1[2] = psi1Gu; psi1[3] = psi1Fr
     # Initialize variables
     if(nrow(ICr)>=1000){
       IC = ICr[rrr:(rrr+Nyrs),]
@@ -145,7 +147,7 @@ HSmod_sim <- function(init_fun,sim.data,mcmc1,vn1) {
       gamma_D = (phiS*Nml[i])^thtaS 
       haz_0 = exp(omega + gamma_0 + gamma_D + dlta[2] * CI[i+1] + epsS[i]) ; #  + epsJ[i]
       for(a in 1:Nareas){ 
-        gamma_I[a] = 8 * exp((psi1+psiadj[a]) - (IC[i,a] * psi2)) / (1 + exp((psi1+psiadj[a]) - (IC[i,a] * psi2))) 
+        gamma_I[a] = 8 * exp(psi1[a] - (IC[i,a] * psi2)) / (1 + exp(psi1[a] - (IC[i,a] * psi2))) 
         haz_I_A[a] = exp(omega + gamma_I[a]) 
       } 
       haz_I = sum(PA[i,] * haz_I_A)

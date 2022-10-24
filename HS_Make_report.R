@@ -10,7 +10,7 @@ stop_quietly <- function() {
   stop()
 }
 rspnse = dlg_message(c("This script is used to generate an html report that summarizes results of  ",
-                       "an age-structure population model fit to harp seal data. ",
+                       "an age-structured population model fit to harp seal data. ",
                        "You can begin by selecting a Results file. ",
                        "Continue?"), "okcancel")$res
 if(rspnse == "cancel"){

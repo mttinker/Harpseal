@@ -1,10 +1,12 @@
 # Import data
 require(readxl)
+require(stats)
 df.sad = read_excel("./data/SAD0_36.xlsx")
 # CI index
 df.NLCI = read_excel("./data/NL_climate_index.xlsx")
 # Ice Anomalies
-df.Ice = read_excel("./data/IceAnom.xlsx")
+df.Ice = read_excel("./data/IceAnom_new.xlsx")
+#
 # Removals (harvest)
 df.HV = read_excel("./data/Raw-removal-1952.xlsx")
 df.HV$Grnpup = round(df.HV$greenland*df.HV$PpupGrnlnd)
@@ -54,3 +56,36 @@ AgeComp = t(df.Age[,-1])
 # newdata$Pred = predict(fit, newdata)
 # plot(df.Rep$Age[df.Rep$Year<1970],df.Rep$Prob[df.Rep$Year<1970])
 # lines(newdata$Pred ~ newdata$Age)
+#
+# Calculate smoothed pregnancy rate (as per previous model)
+#
+# require(locfit)
+# require(ggplot2)
+# require(gtools)
+# ii = which(df.Rep$Year>1960 & df.Rep$Age==8 & df.Rep$N>4)
+# dat_Prg = data.frame(Years = df.Rep$Year[ii] - 1960,
+#                  Nsamp = df.Rep$N[ii],
+#                  Npreg = df.Rep$Preg[ii])
+# dat_Prg$Ppn_obs= dat_Prg$Npreg/dat_Prg$Nsamp
+# dat_Prg$Ppn_se= sqrt((dat_Prg$Ppn_obs * (1 - dat_Prg$Ppn_obs) )/ dat_Prg$Nsamp)
+# fit = locfit(Npreg ~ lp(Years,deg=2,nn=0.95),weights=Nsamp,data=dat_Prg,family="binomial")
+# newdat = seq(1,2019-1960)
+# pred_dat = predict(fit,newdat,se.fit=T)
+# Smthpreg = data.frame(Year = seq(1961,2019),
+#                       Preg_smth = pred_dat$fit,
+#                       Preg_smth_SE = pred_dat$se.fit)
+# tmp = preplot(fit,newdat,band = "local")
+# tmp$CI_lo = inv.logit(tmp$fit - 1.96*tmp$se.fit) 
+# tmp$CI_hi = inv.logit(tmp$fit + 1.96*tmp$se.fit) 
+# Smthpreg$Preg_smth_lo = tmp$CI_lo
+# Smthpreg$Preg_smth_hi = tmp$CI_hi
+# 
+# ggplot(Smthpreg,aes(x=Year,y=Preg_smth)) +
+#   geom_ribbon(aes(ymin=Preg_smth_lo,ymax=Preg_smth_hi),alpha=0.2) +
+#   geom_line() +
+#   geom_point(data=dat_Prg,aes(x=Years+1960,y=Ppn_obs)) +
+#   geom_errorbar(data=dat_Prg,aes(x=Years+1960,y=Ppn_obs,
+#                                  ymin=Ppn_obs-Ppn_se,ymax=Ppn_obs+Ppn_se)) +
+#   theme_classic()
+# 
+
