@@ -1,10 +1,10 @@
 Results/
 Oldcode/
+data/old_data/
 HSmodel.Rproj
 Results.rdata
 HSmodfit.rds
 HSmodel_summary.html
-HSmodfit.exe
 TAC_K_est.rdata
 .Rhistory
 .Rproj.user
