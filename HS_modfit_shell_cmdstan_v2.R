@@ -13,7 +13,7 @@ N0pri = 2.5  # prior rough estimate of starting pop size, in millions
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1
 # Youngest adult age class to consider for age composition fitting
-NCage1 = 6; # Note: recommend at least 4, younger ages subject to negative sampling bias
+NCage1 = 4; # Note: recommend at least 4, younger ages subject to negative sampling bias
 nburnin = 300
 nsamples = 2500
 # End user parameters--------------------------------------------------------
@@ -100,6 +100,7 @@ for(i in 1:(Nyrs)){
     PA[i,] = NPA[ii,]
   }
 }
+PA = PA[-Nyrs,]
 #
 CI = numeric(length = Nyrs)
 WI = numeric(length = Nyrs)
@@ -124,7 +125,6 @@ for (y in 1:Nyrs){
     Q_0[y] = df.HV$PUP_prob_rec[ii]
   }
 }
-PA = PA[-Nyrs,]
 #
 # Newborn pup survival (accounts for abortions and deaths prior to up survey)
 # - for current model fix this at 0.95
@@ -137,9 +137,9 @@ agesC2 = (pmax(0,c(0,ages)-10))^2
 fitmodel = c("HSmodfit_v2.stan")
 stan.data <- list(NPcts=NPcts,NCages=NCages,NCage1=NCage1,NCobs=NCobs,
                     NPRobs=NPRobs,Nyrs=Nyrs,Nages=Nages,Nareas=Nareas,
-                    ages=ages,agesC=agesC,agesC2=agesC2,sad0=sad0,CI=CI,WI=WI,
+                    ages=ages,agesC=agesC,agesC2=agesC2,CI=CI,WI=WI,
                     Pups=Pups,sdNP=sdNP,Agects=Agects,NFsamp=NFsamp,
-                    NPrg=NPrg,YrPct=YrPct,PAidx=PAidx,YrAGsmp=YrAGsmp,
+                    NPrg=NPrg,YrPct=YrPct,YrAGsmp=YrAGsmp,sad0=sad0,
                     H_0=H_0,H_A=H_A,YrPRsmp=YrPRsmp,AgePRsmp=AgePRsmp, 
                     omega=omega,Q_A=Q_A,Q_0=Q_0,CV_HV=CV_HV,N0pri=N0pri,
                     Snp=Snp)  

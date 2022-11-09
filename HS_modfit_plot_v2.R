@@ -40,6 +40,7 @@ Year = seq(Year1,Year1+Nyrs-2)
 Yearp = seq(Year1,Year1+Nyrs-1)
 Nyrsm1 = Nyrs - 1
 df.prev = read_excel("./data/Prev_model_project.xlsx")
+plotpri = 0
 # Diagnostics -----------------------------------------------
 #
 # Posterior predictive check for pup counts
@@ -159,45 +160,45 @@ write.excel <- function(x,row.names=T,col.names=TRUE,...) {
 write.excel(dp2)
 #
 # Preg rate by age----------------------------------------------------------
-PR1966 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][16]
-PR1966per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][1:32],na.rm = T)
-crct1 = PR1966per/PR1966
-PR2016 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][66]
-PR2016per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][50:69],na.rm = T)
-crct2 = PR2016per/PR2016
-
-dp3 = data.frame(Age=ages, Year = (rep(1966,Nages)),Period=rep("1951-1985",Nages),
-                 PRexp=sumstats[startsWith(vns,"Fc1966_prdct[")==T,1]*crct1,
-                 PR_lo = sumstats[startsWith(vns,"Fc1966_prdct[")==T,4]*crct1,
-                 PR_hi = sumstats[startsWith(vns,"Fc1966_prdct[")==T,8]*crct1)
-dp3 = rbind(dp3, data.frame(Age=ages, Year = (rep(2016,Nages)),
-                 Period=rep("1990-2019",Nages),           
-                 PRexp=sumstats[startsWith(vns,"Fc2016_prdct[")==T,1]*crct2,
-                 PR_lo = sumstats[startsWith(vns,"Fc2016_prdct[")==T,4]*crct2,
-                 PR_hi = sumstats[startsWith(vns,"Fc2016_prdct[")==T,8]*crct2))
-dp3$Obs = numeric(length = nrow(dp3))
-dp3$ObsSE = numeric(length = nrow(dp3))
-for (i in 1:nrow(dp3)){
-  ii = which(df.Rep$Age==dp3$Age[i] & df.Rep$Year>(dp3$Year[i]-20) & 
-               df.Rep$Year<(dp3$Year[i]+20))
-  dp3$Obs[i] = mean(df.Rep$Prob[ii])
-  dp3$ObsSE[i] = sd(df.Rep$Prob[ii])/sqrt(length(df.Rep$Prob[ii]))
-}
-dp3$Year = as.factor(dp3$Year); dp3$Period = as.factor(dp3$Period)
-dp3 = dp3[which(dp3$Age<11),]
-pl3 = ggplot(data=dp3,aes(x=Age,y=PRexp,group=Period,color = Period, fill=Period)) +
-  geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) + ylim(0,1) +
-  geom_line() + labs(x = "Age",y="Pregnancy rate") +
-  geom_point(aes(y=Obs),size=2) +
-  geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
-                      ymax = Obs+1.96*ObsSE),width=.2) +
-  # ggtitle("Model estimated vs observed pregancy rates by age",
-  #         subtitle = "Low density (1951-1985) vs. high density (1990-2019) population") + 
-  # scale_color_discrete(palette="Harmonic") +
-  scale_color_brewer(palette="Dark2") +
-  scale_fill_brewer(palette="Dark2") +
-  theme_classic() 
-print(pl3)
+# PR1966 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][16]
+# PR1966per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][1:32],na.rm = T)
+# crct1 = PR1966per/PR1966
+# PR2016 = sumstats[startsWith(vns,"Fc8_prdct[")==T,1][66]
+# PR2016per = mean(sumstats[startsWith(vns,"Fc8_prdct[")==T,1][50:69],na.rm = T)
+# crct2 = PR2016per/PR2016
+# 
+# dp3 = data.frame(Age=ages, Year = (rep(1966,Nages)),Period=rep("1951-1985",Nages),
+#                  PRexp=sumstats[startsWith(vns,"Fc1966_prdct[")==T,1]*crct1,
+#                  PR_lo = sumstats[startsWith(vns,"Fc1966_prdct[")==T,4]*crct1,
+#                  PR_hi = sumstats[startsWith(vns,"Fc1966_prdct[")==T,8]*crct1)
+# dp3 = rbind(dp3, data.frame(Age=ages, Year = (rep(2016,Nages)),
+#                  Period=rep("1990-2019",Nages),           
+#                  PRexp=sumstats[startsWith(vns,"Fc2016_prdct[")==T,1]*crct2,
+#                  PR_lo = sumstats[startsWith(vns,"Fc2016_prdct[")==T,4]*crct2,
+#                  PR_hi = sumstats[startsWith(vns,"Fc2016_prdct[")==T,8]*crct2))
+# dp3$Obs = numeric(length = nrow(dp3))
+# dp3$ObsSE = numeric(length = nrow(dp3))
+# for (i in 1:nrow(dp3)){
+#   ii = which(df.Rep$Age==dp3$Age[i] & df.Rep$Year>(dp3$Year[i]-20) & 
+#                df.Rep$Year<(dp3$Year[i]+20))
+#   dp3$Obs[i] = mean(df.Rep$Prob[ii])
+#   dp3$ObsSE[i] = sd(df.Rep$Prob[ii])/sqrt(length(df.Rep$Prob[ii]))
+# }
+# dp3$Year = as.factor(dp3$Year); dp3$Period = as.factor(dp3$Period)
+# dp3 = dp3[which(dp3$Age<11),]
+# pl3 = ggplot(data=dp3,aes(x=Age,y=PRexp,group=Period,color = Period, fill=Period)) +
+#   geom_ribbon(aes(ymin=PR_lo,ymax=PR_hi),alpha=0.3) + ylim(0,1) +
+#   geom_line() + labs(x = "Age",y="Pregnancy rate") +
+#   geom_point(aes(y=Obs),size=2) +
+#   geom_errorbar(aes(ymin = Obs-1.96*ObsSE, 
+#                       ymax = Obs+1.96*ObsSE),width=.2) +
+#   # ggtitle("Model estimated vs observed pregancy rates by age",
+#   #         subtitle = "Low density (1951-1985) vs. high density (1990-2019) population") + 
+#   # scale_color_discrete(palette="Harmonic") +
+#   scale_color_brewer(palette="Dark2") +
+#   scale_fill_brewer(palette="Dark2") +
+#   theme_classic() 
+# print(pl3)
 #
 # Preg rate 8+ over time----------------------------------------------------
 dp4 = data.frame(Year=Year,PRexp=sumstats[startsWith(vns,"Fc8_prdct[")==T,1],
@@ -384,9 +385,9 @@ pl8b = ggplot(data=dp8,aes(x=Year,y=S0_stoc)) +
   scale_x_continuous(breaks = seq(1950,2020,by=5)) +
   theme_bw() + theme(panel.grid.minor.y = element_blank(),
                      panel.grid.minor.x = element_blank())
-# print(pl8)
+print(pl8b)
 
-plot_grid(pl7,pl8,pl8b,nrow = 3,labels = c("A","B","C"))
+# plot_grid(pl7,pl8,pl8b,nrow = 3,labels = c("A","B","C"))
 
 # Age-specific survival -----------------------------------------------------------
 tmp = data.frame(Density = "Low", Age = ages)
@@ -501,11 +502,10 @@ NN = seq(.1,5.8,by=0.1)
 gamma0_r = mcmc[iir,vn=="gamma_0"]
 phiS_r = mcmc[iir,vn=="phi[2]"]
 thtaS_r = mcmc[iir,vn=="thta[2]"]
-hazImn = sumstats[which(startsWith(vns,"haz_Ice[1")),1][21]  
 S0 = matrix(0,nrow = 1000,ncol=length(NN))
 for(r in 1:1000){
   haz_J = exp(omega + gamma0_r[r] + ( phiS_r[r] *NN)^thtaS_r[r])  
-  S0[r,] = exp(-1 * (haz_J + hazImn + exp(omega)))
+  S0[r,] = exp(-1 * (haz_J + exp(omega)))
 }
 S0_mean = colMeans(S0)
 S0_lo = apply(S0, 2, quantile, prob=0.05)
@@ -610,49 +610,50 @@ write.excel <- function(x,row.names=T,col.names=TRUE,...) {
 write.excel(statsum)
 
 # Plot priors vs posteriors ---------------------------------
-ixn = row.names(statsum)
-Npri = length(ix)
-df.pri = read_excel("./data/Priordefs_v2.xlsx")
-Paramname = character()
-Priorvals = numeric()
-Priorprob = numeric() 
-Postdens = numeric()  
-reps3 = 500
-for(i in 1:Npri){
-  vals = seq(df.pri$lowerbnd[i],df.pri$upperbnd[i],length.out=reps3)+.0000001
-  vals = vals * (1/df.pri$rescale[i])
-  dst = df.pri$PriorDist[i]
-  if(dst=="normal"){
-    probs = dnorm(vals,df.pri$par1[i],df.pri$par2[i])
-  }else if(dst=="gamma"){
-    probs = dgamma(vals,df.pri$par1[i],df.pri$par2[i])  
-  }else if(dst=="cauchy"){
-    probs = dcauchy(vals,df.pri$par1[i],df.pri$par2[i])  
+if(plotpri == 1){
+  ixn = row.names(statsum)
+  Npri = length(ix)
+  df.pri = read_excel("./data/Priordefs_v2.xlsx")
+  Paramname = character()
+  Priorvals = numeric()
+  Priorprob = numeric() 
+  Postdens = numeric()  
+  reps3 = 500
+  for(i in 1:Npri){
+    vals = seq(df.pri$lowerbnd[i],df.pri$upperbnd[i],length.out=reps3)+.0000001
+    vals = vals * (1/df.pri$rescale[i])
+    dst = df.pri$PriorDist[i]
+    if(dst=="normal"){
+      probs = dnorm(vals,df.pri$par1[i],df.pri$par2[i])
+    }else if(dst=="gamma"){
+      probs = dgamma(vals,df.pri$par1[i],df.pri$par2[i])  
+    }else if(dst=="cauchy"){
+      probs = dcauchy(vals,df.pri$par1[i],df.pri$par2[i])  
+    }
+    vals = vals * df.pri$rescale[i]
+    probs = probs*(1/max(probs))
+    posts = mcmc[,ix[i]]; if(vn[ix[i]]=="N0"){posts = posts/1000000 }
+    ft = density(posts)
+    postprobs = approx(ft$x,ft$y,xout=vals); postprobs = postprobs$y
+    postprobs[is.na(postprobs)] = 0
+    postprobs = postprobs*(1/max(postprobs))
+    Paramname = c(Paramname,rep(ixn[i],reps3))
+    Priorvals = c(Priorvals,vals)
+    Priorprob = c(Priorprob,probs)
+    Postdens = c(Postdens,postprobs)
   }
-  vals = vals * df.pri$rescale[i]
-  probs = probs*(1/max(probs))
-  posts = mcmc[,ix[i]]; if(vn[ix[i]]=="N0"){posts = posts/1000000 }
-  ft = density(posts)
-  postprobs = approx(ft$x,ft$y,xout=vals); postprobs = postprobs$y
-  postprobs[is.na(postprobs)] = 0
-  postprobs = postprobs*(1/max(postprobs))
-  Paramname = c(Paramname,rep(ixn[i],reps3))
-  Priorvals = c(Priorvals,vals)
-  Priorprob = c(Priorprob,probs)
-  Postdens = c(Postdens,postprobs)
+  dp_pri = data.frame(Paramname=Paramname,
+                      Priorvals=Priorvals,
+                      Priorprob=Priorprob,
+                      Postdens=Postdens)
+  dp_pri$Paramname = factor(dp_pri$Paramname, levels = ixn)
+  plt_pri = ggplot(dp_pri,aes(x=Priorvals)) +
+    geom_area(aes(y=Priorprob),fill="lightgrey") +
+    geom_line(aes(y=Priorprob),color="darkgrey") +
+    geom_area(aes(y=Postdens),fill="black",alpha=0.5) +
+    geom_line(aes(y=Priorprob),color="white",linetype="dashed") +
+    labs(x = "Value",y="Probability density") +
+    theme_classic() +
+    facet_wrap(~ Paramname,nrow = 5,ncol = 5,scales = "free")
+  print(plt_pri)
 }
-dp_pri = data.frame(Paramname=Paramname,
-                    Priorvals=Priorvals,
-                    Priorprob=Priorprob,
-                    Postdens=Postdens)
-dp_pri$Paramname = factor(dp_pri$Paramname, levels = ixn)
-plt_pri = ggplot(dp_pri,aes(x=Priorvals)) +
-  geom_area(aes(y=Priorprob),fill="lightgrey") +
-  geom_line(aes(y=Priorprob),color="darkgrey") +
-  geom_area(aes(y=Postdens),fill="black",alpha=0.5) +
-  geom_line(aes(y=Priorprob),color="white",linetype="dashed") +
-  labs(x = "Value",y="Probability density") +
-  theme_classic() +
-  facet_wrap(~ Paramname,nrow = 5,ncol = 5,scales = "free")
-print(plt_pri)
-  

@@ -1,17 +1,17 @@
 # Import data
 require(readxl)
 require(stats)
-df.sad = read_excel("./data/SAD0_36.xlsx")
+df.sad = read_excel("./data/SAD0_36_v2.xlsx")
 # CI index
-df.NLCI = read_excel("./data/NL_climate_index.xlsx")
+df.NLCI = read_excel("./data/NL_climate_index_v2.xlsx")
 
 # Wind index
 df.wind = read_excel("./data/Wind_anomaly_v2.xlsx")
 # Ice Anomalies - currently unused
-#  df.Ice = read_excel("./data/IceAnom_new.xlsx")
+#  df.Ice = read_excel("./data/IceAnom_v2.xlsx")
 #
 # Removals (harvest)
-df.HV = read_excel("./data/Raw-removal-1952.xlsx")
+df.HV = read_excel("./data/Raw-removal-1952_v2.xlsx")
 df.HV$Grnpup = round(df.HV$greenland*df.HV$PpupGrnlnd)
 df.HV$Grn1plus = round(df.HV$greenland - df.HV$Grnpup)
 df.HV$Arctpup = round(0.034*df.HV$arctic)
@@ -35,11 +35,11 @@ df.HV$ADLTOTwSNL = df.HV$can1plus_wsnl + df.HV$by1plus + df.HV$Grn1plus_wsnl + d
 df.HV$PUP_prob_rec = df.HV$PUPTOT / df.HV$PUPTOTwSNL
 df.HV$ADL_prob_rec = df.HV$ADLTOT / df.HV$ADLTOTwSNL
 # Pup Production
-df.Pup = read_excel("./data/PupProd.xlsx")
+df.Pup = read_excel("./data/PupProd_v2.xlsx")
 # Abort_rate
-df.Ab = read_excel("./data/Abort_rate.xlsx")
+df.Ab = read_excel("./data/Abort_rate_v2.xlsx")
 # Reproduction data (Pregnancy rates)
-df.Rep = read_excel("./data/Reprodat.xlsx")
+df.Rep = read_excel("./data/Reprodat_v2.xlsx")
 # Create matrix of age structure data for select years
 # Filter pregnancy data 
 ii = which(df.Rep$N==0 | is.na(df.Rep$Preg))
@@ -47,7 +47,7 @@ df.Rep = df.Rep[-ii,]
 rm(ii,tmp)
 
 # Age samples for age composition of adults
-df.Age = read_excel("./data/Ages_sampled.xlsx")
+df.Age = read_excel("./data/Ages_sampled_v2.xlsx")
 Years_ages = as.numeric(colnames(df.Age[,-1]))
 AgeComp = t(df.Age[,-1])
 
