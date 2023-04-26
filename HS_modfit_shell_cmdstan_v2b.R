@@ -12,9 +12,10 @@ N0pri = 2.5  # prior rough estimate of starting pop size, in millions
 # Assumed CV for harvest/bycatch totals:
 CV_HV = 0.1
 # Youngest adult age class to consider for age composition fitting
-NCage1 = 4; # Note: recommend at least 4, younger ages subject to negative sampling bias
+NCage1 = 7; # Note: recommend at least 4, younger ages subject to negative sampling bias
 NCyear1 = 1984 ;
-Age_bias_adj = 20 ; # age bias adjustment: percent reduced avail. for ages <8 
+Age_bias_adj = 0 ; # age bias adjustment: percent reduced avail. for ages <8 
+Age_bias_adj_yr1 = 2001 ; # age bias adjustment: percent reduced avail. for ages <8 
 nburnin = 300
 nsamples = 2500
 # End user parameters--------------------------------------------------------

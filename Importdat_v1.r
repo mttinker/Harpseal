@@ -34,7 +34,7 @@ df.HV$ADLTOTwSNL = df.HV$can1plus_wsnl + df.HV$by1plus + df.HV$Grn1plus_wsnl + d
 df.HV$PUP_prob_rec = df.HV$PUPTOT / df.HV$PUPTOTwSNL
 df.HV$ADL_prob_rec = df.HV$ADLTOT / df.HV$ADLTOTwSNL
 # Pup Production
-df.Pup = read_excel("./data/PupProd_v1.xlsx")
+df.Pup = read_excel("./data/PupProd_v1_cvadj.xlsx")
 # Abort_rate
 df.Ab = read_excel("./data/Abort_rate_v1.xlsx")
 # Reproduction data (Pregnancy rates)
